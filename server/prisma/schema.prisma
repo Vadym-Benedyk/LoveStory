@@ -1,0 +1,298 @@
+// Riverside guest house — data model.
+// Money is stored as integer minor units (cents). Dates use @db.Date (no TZ) for stay nights.
+// The CONFIRMED-booking overlap exclusion constraint is added in a manual migration
+// (Prisma can't express btree_gist exclusion constraints yet) — see migrations + product-design.md §6.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+enum Role {
+  OWNER
+  MANAGER
+  EDITOR
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         Role      @default(OWNER)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  confirmedBookings Booking[]       @relation("ConfirmedBy")
+  calendarBlocks    CalendarBlock[]
+  auditLogs         AuditLog[]
+}
+
+// ---------------------------------------------------------------------------
+// Booking
+// ---------------------------------------------------------------------------
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+enum BookingSource {
+  WEBSITE
+  MANUAL
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  reference   String        @unique
+  guestName   String
+  guestPhone  String
+  guestEmail  String?
+  guestsCount Int           @default(2)
+  checkIn     DateTime      @db.Date // inclusive
+  checkOut    DateTime      @db.Date // exclusive (half-open [checkIn, checkOut))
+  status      BookingStatus @default(PENDING)
+  source      BookingSource @default(WEBSITE)
+
+  priceQuoteMinor Int
+  currency        String @default("USD")
+
+  comments      String?
+  internalNotes String?
+
+  appliedPromotionId String?
+  appliedPromotion   Promotion? @relation(fields: [appliedPromotionId], references: [id])
+
+  confirmedAt DateTime?
+  confirmedById String?
+  confirmedBy   User?    @relation("ConfirmedBy", fields: [confirmedById], references: [id])
+
+  addons    BookingAddon[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([status, checkIn, checkOut])
+  @@index([createdAt])
+}
+
+model CalendarBlock {
+  id        String   @id @default(cuid())
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date // exclusive
+  reason    String?
+  createdById String?
+  createdBy   User?  @relation(fields: [createdById], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([startDate, endDate])
+}
+
+// ---------------------------------------------------------------------------
+// Pricing
+// ---------------------------------------------------------------------------
+enum PriceKind {
+  BASE
+  WEEKEND
+  SEASONAL
+}
+
+model PriceRule {
+  id              String    @id @default(cuid())
+  name            String
+  kind            PriceKind
+  nightlyRateMinor Int
+  currency        String    @default("USD")
+  appliesFrom     DateTime? @db.Date // SEASONAL only
+  appliesTo       DateTime? @db.Date // SEASONAL only
+  daysOfWeek      Int[]     @default([]) // WEEKEND: e.g. [5,6] (Fri,Sat)
+  minNights       Int?
+  priority        Int       @default(0) // higher wins on overlap
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+enum AddonUnit {
+  PER_STAY
+  PER_NIGHT
+  PER_PERSON
+}
+
+model Addon {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  priceMinor  Int
+  currency    String         @default("USD")
+  unit        AddonUnit      @default(PER_STAY)
+  isActive    Boolean        @default(true)
+  sortOrder   Int            @default(0)
+  bookings    BookingAddon[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model BookingAddon {
+  id             String  @id @default(cuid())
+  bookingId      String
+  booking        Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  addonId        String
+  addon          Addon   @relation(fields: [addonId], references: [id])
+  quantity       Int     @default(1)
+  unitPriceMinor Int // snapshot at booking time
+
+  @@index([bookingId])
+}
+
+// ---------------------------------------------------------------------------
+// Marketing / content
+// ---------------------------------------------------------------------------
+enum DiscountType {
+  PERCENT
+  FIXED
+  PACKAGE
+}
+
+model Promotion {
+  id            String       @id @default(cuid())
+  title         String
+  slug          String       @unique
+  body          String
+  imageMediaId  String?
+  imageMedia    Media?       @relation(fields: [imageMediaId], references: [id])
+  discountType  DiscountType @default(PERCENT)
+  discountValue Int? // percent or minor units depending on type
+  validFrom     DateTime?    @db.Date
+  validTo       DateTime?    @db.Date
+  isActive      Boolean      @default(true)
+  sortOrder     Int          @default(0)
+  bookings      Booking[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  HIDDEN
+}
+
+enum ReviewSource {
+  WEBSITE
+  IMPORTED
+  SOCIAL
+}
+
+model Review {
+  id         String       @id @default(cuid())
+  authorName String
+  rating     Int // 1..5
+  title      String?
+  body       String
+  stayMonth  String? // free text e.g. "August 2025"
+  status     ReviewStatus @default(PENDING)
+  source     ReviewSource @default(WEBSITE)
+  ownerReply String?
+  approvedAt DateTime?
+  approvedById String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([status])
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum MediaCategory {
+  HOUSE
+  RIVER
+  BBQ
+  TUB
+  NATURE
+  OTHER
+}
+
+model Media {
+  id           String        @id @default(cuid())
+  type         MediaType     @default(IMAGE)
+  storageKey   String // S3/R2 object key
+  url          String
+  thumbnailUrl String?
+  title        String?
+  altText      String        @default("") // required for IMAGE (enforced in service)
+  category     MediaCategory @default(OTHER)
+  width        Int?
+  height       Int?
+  durationSec  Int?
+  sortOrder    Int           @default(0)
+  isHero       Boolean       @default(false)
+  isActive     Boolean       @default(true)
+  promotions   Promotion[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([category, isActive, sortOrder])
+}
+
+// Editable site copy. key e.g. "hero.headline". Seeded with defaults.
+model ContentBlock {
+  id        String   @id @default(cuid())
+  key       String
+  locale    String   @default("en")
+  value     String
+  updatedById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([key, locale])
+}
+
+// Singleton settings row (id = "default").
+model SiteSettings {
+  id                  String   @id @default("default")
+  propertyName        String   @default("LoveStory Riverside Retreat")
+  capacity            Int      @default(4)
+  areaSqm             Int      @default(60)
+  phone               String   @default("")
+  whatsapp            String?
+  email               String   @default("")
+  address             String   @default("")
+  lat                 Float?
+  lng                 Float?
+  mapEmbed            String?
+  notificationEmail   String   @default("")
+  notificationChannels Json    @default("{}")
+  socialLinks         Json     @default("{}")
+  currency            String   @default("USD")
+  timezone            String   @default("UTC")
+  updatedAt           DateTime @updatedAt
+}
+
+model AuditLog {
+  id       String   @id @default(cuid())
+  actorId  String?
+  actor    User?    @relation(fields: [actorId], references: [id])
+  action   String
+  entity   String
+  entityId String?
+  meta     Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}

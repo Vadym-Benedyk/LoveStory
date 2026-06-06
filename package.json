@@ -1,0 +1,33 @@
+
+{
+  "name": "lovestory-riverside-retreat",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Riverside guest house — boutique retreat website with manual-confirmation booking",
+  "engines": {
+    "node": ">=20 <23"
+  },
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n client,server -c cyan,green \"npm:dev:client\" \"npm:dev:server\"",
+    "dev:client": "npm --workspace client run dev",
+    "dev:server": "npm --workspace server run dev",
+    "build": "npm --workspace server run build && npm --workspace client run build",
+    "build:client": "npm --workspace client run build",
+    "build:server": "npm --workspace server run build",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "npm --workspace client run typecheck && npm --workspace server run typecheck",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "migrate": "npm --workspace server run prisma:migrate",
+    "seed": "npm --workspace server run prisma:seed",
+    "format": "prettier --write \"**/*.{ts,tsx,scss,json,md}\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "prettier": "^3.4.2"
+  }
+}

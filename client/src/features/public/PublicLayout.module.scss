@@ -1,0 +1,75 @@
+@use '@/styles/tokens' as t;
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.nav {
+  backdrop-filter: blur(8px);
+  background: rgba(251, 248, 241, 0.85) !important;
+  border-bottom: 1px solid rgba(43, 38, 32, 0.06);
+
+  :global(.MuiToolbar-root) {
+    gap: 1rem;
+  }
+}
+
+.brand {
+  font-family: t.$font-title !important;
+  font-size: 2rem !important;
+  color: t.$forest;
+  text-decoration: none;
+  flex: 0 0 auto;
+  font-weight: 900 !important;
+  letter-spacing: 0.5px;
+}
+
+.links {
+  display: none;
+  flex: 1;
+  gap: 1.5rem;
+  margin-left: 2rem;
+
+  a {
+    color: t.$bark;
+    text-decoration: none;
+    font-weight: 500;
+
+    &:hover {
+      color: t.$forest;
+    }
+  }
+
+  @include t.up(t.$bp-md) {
+    display: flex;
+  }
+}
+
+.footer {
+  margin-top: auto;
+  background: t.$forest;
+  color: t.$cream;
+  padding: t.$space-section 0 4rem;
+
+  :global(h5) {
+    font-family: 'Corinthia', cursive;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+}
+
+.mobileCta {
+  position: fixed;
+  inset: auto 0 0 0;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  background: rgba(251, 248, 241, 0.95);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(43, 38, 32, 0.08);
+  z-index: 1100;
+
+  @include t.up(t.$bp-md) {
+    display: none;
+  }
+}

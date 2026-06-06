@@ -1,0 +1,15 @@
+node_modules/
+.DS_Store
+.idea/
+dist/
+build/
+*.log
+.env
+.env.local
+.env.*.local
+
+# npm cache (local)
+.npmcache/
+
+# Claude local settings
+.claude/settings.local.json

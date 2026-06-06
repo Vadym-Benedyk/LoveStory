@@ -1,0 +1,124 @@
+@use '@/styles/tokens' as t;
+
+.hero {
+  position: relative;
+  min-height: 92vh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: t.$cream;
+  background:
+    linear-gradient(rgba(43, 38, 32, 0.35), rgba(43, 38, 32, 0.55)),
+    url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1600&q=70')
+      center/cover no-repeat;
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+}
+
+.heroInner {
+  position: relative;
+  z-index: 1;
+  padding-block: 6rem;
+}
+
+.heroTitle {
+  font-size: clamp(2.5rem, 7vw, 5rem);
+  margin-bottom: 1rem;
+}
+
+.heroSub {
+  font-size: clamp(1rem, 2.5vw, 1.4rem);
+  max-width: 38ch;
+  margin: 0 auto 2.5rem;
+  opacity: 0.95;
+}
+
+.section {
+  padding-block: t.$space-section;
+}
+
+.sectionAlt {
+  padding-block: t.$space-section;
+  background: t.$cream;
+}
+
+.lead {
+  font-size: 1.15rem;
+  max-width: 60ch;
+  color: rgba(43, 38, 32, 0.85);
+}
+
+.galleryTile {
+  aspect-ratio: 4 / 3;
+  border-radius: t.$radius;
+  background: linear-gradient(135deg, #cdbfa6, #9fb0a4);
+  box-shadow: t.$shadow-soft;
+}
+
+.amenityCard {
+  padding: 1.75rem;
+  height: 100%;
+  background: t.$sand;
+  border-radius: t.$radius;
+  text-align: center;
+}
+
+.amenityIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  margin-bottom: 1rem;
+  color: t.$forest;
+  background: rgba(62, 86, 65, 0.1);
+}
+
+.reviewCard {
+  padding: 1.75rem;
+  height: 100%;
+  background: t.$sand;
+  border-radius: t.$radius;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.contactCard {
+  padding: 1.75rem;
+  height: 100%;
+  background: t.$sand;
+  border-radius: t.$radius;
+  text-align: center;
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: t.$shadow-soft;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.map,
+.mapPlaceholder {
+  margin-top: 1.5rem;
+  border-radius: t.$radius;
+  overflow: hidden;
+}
+
+.mapPlaceholder {
+  display: grid;
+  place-items: center;
+  height: 320px;
+  background: #e4ddcd;
+  color: rgba(43, 38, 32, 0.6);
+}

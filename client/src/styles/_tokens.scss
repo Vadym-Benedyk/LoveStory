@@ -1,0 +1,39 @@
+// Single source of design tokens for SCSS modules.
+// Keep in sync with the MUI theme (src/theme/theme.ts). When a value changes, change both.
+
+// Palette
+$forest: #3e5641; // primary
+$clay: #b5651d; // secondary
+$sand: #f5f0e6; // page background
+$cream: #fbf8f1; // surfaces
+$bark: #2b2620; // text
+$river: #5b7e8c; // accent / links
+$name: #ab0707;
+
+$status-available: #4f7a52;
+$status-pending: #c8841f;
+$status-confirmed: #9a958c;
+
+// Typography
+$font-display: 'Cormorant Garamond', Georgia, serif;
+$font-title: 'Corinthia', cursive;
+$font-body: 'Inter', system-ui, sans-serif;
+
+// Radii & shadow
+$radius: 14px;
+$radius-lg: 20px;
+$shadow-soft: 0 10px 30px rgba(43, 38, 32, 0.08);
+
+// Breakpoints (mobile-first)
+$bp-sm: 600px;
+$bp-md: 900px;
+$bp-lg: 1200px;
+
+// Spacing scale
+$space-section: clamp(3rem, 8vw, 7rem);
+
+@mixin up($bp) {
+  @media (min-width: $bp) {
+    @content;
+  }
+}

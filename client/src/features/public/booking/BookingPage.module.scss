@@ -1,0 +1,69 @@
+@use '@/styles/tokens' as t;
+
+.page {
+  padding-block: clamp(2rem, 6vw, 5rem);
+  padding-bottom: 6rem; // clear mobile sticky CTA
+}
+
+.intro {
+  max-width: 60ch;
+  margin-bottom: 2rem;
+  color: rgba(43, 38, 32, 0.85);
+}
+
+.calendarCard,
+.formCard {
+  padding: 1.5rem;
+  background: t.$cream;
+  border-radius: t.$radius-lg;
+  box-shadow: t.$shadow-soft;
+}
+
+.legend {
+  margin: 0.5rem 0 1rem;
+  font-size: 0.85rem;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+}
+
+.dotAvailable,
+.dotBlocked {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dotAvailable {
+  background: t.$status-available;
+}
+
+.dotBlocked {
+  background: t.$status-confirmed;
+}
+
+.quote {
+  text-align: center;
+}
+
+.consent {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.confirm {
+  padding: clamp(2rem, 6vw, 4rem);
+  background: t.$cream;
+  border-radius: t.$radius-lg;
+  box-shadow: t.$shadow-soft;
+  text-align: center;
+  max-width: 640px;
+  margin: 2rem auto;
+}

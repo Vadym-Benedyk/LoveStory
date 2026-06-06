@@ -1,0 +1,39 @@
+# Local dev infra. Low-traffic single-property app: one small Postgres is plenty.
+# MinIO gives an S3-compatible target locally so media code matches prod (R2/S3).
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: lovestory_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lovestory
+      POSTGRES_PASSWORD: lovestory
+      POSTGRES_DB: lovestory
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lovestory"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Optional local S3 — comment out if using a real bucket in dev.
+  minio:
+    image: minio/minio:latest
+    container_name: lovestory_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  db_data:
+  minio_data:
