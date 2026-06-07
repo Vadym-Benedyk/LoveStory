@@ -10,18 +10,19 @@ const rule = (over: Partial<PriceRule>): PriceRule => ({
   currency: 'USD',
   appliesFrom: null,
   appliesTo: null,
-  daysOfWeek: [],
+  daysOfWeek: '',
   minNights: null,
   priority: 0,
   isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
+  ...over,
 });
 
 describe('pricing engine', () => {
   const rules = [
     rule({ name: 'Base', kind: 'BASE', nightlyRateMinor: 10000, priority: 0 }),
-    rule({ name: 'Weekend', kind: 'WEEKEND', nightlyRateMinor: 15000, daysOfWeek: [5, 6], priority: 10 }),
+    rule({ name: 'Weekend', kind: 'WEEKEND', nightlyRateMinor: 15000, daysOfWeek: '5,6', priority: 10 }),
   ];
 
   it('charges base rate on weekdays', () => {

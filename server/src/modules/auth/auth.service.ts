@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { Unauthorized } from '../../lib/errors.js';
-import type { AuthUser } from '../../middleware/auth.js';
+import type { AuthUser, Role } from '../../middleware/auth.js';
 
 function signAccess(user: AuthUser) {
   return jwt.sign(user, env.JWT_ACCESS_SECRET, { expiresIn: env.JWT_ACCESS_TTL as never });
@@ -19,7 +19,7 @@ export async function login(email: string, password: string) {
   if (!ok) throw Unauthorized('Invalid credentials');
 
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-  const payload: AuthUser = { id: user.id, role: user.role, email: user.email };
+  const payload: AuthUser = { id: user.id, role: user.role as Role, email: user.email };
   return {
     accessToken: signAccess(payload),
     refreshToken: signRefresh({ id: user.id }),
@@ -36,7 +36,7 @@ export async function refresh(token: string) {
   }
   const user = await prisma.user.findUnique({ where: { id: decoded.id } });
   if (!user || !user.isActive) throw Unauthorized('User not found');
-  const payload: AuthUser = { id: user.id, role: user.role, email: user.email };
+  const payload: AuthUser = { id: user.id, role: user.role as Role, email: user.email };
   return { accessToken: signAccess(payload) };
 }
 

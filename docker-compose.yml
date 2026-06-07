@@ -1,25 +1,7 @@
-# Local dev infra. Low-traffic single-property app: one small Postgres is plenty.
-# MinIO gives an S3-compatible target locally so media code matches prod (R2/S3).
+# SQLite needs no database server, so there's nothing to run for the DB.
+# This file only provides optional local S3-compatible storage (MinIO) for gallery uploads.
+# You can skip it entirely until you wire up media uploads.
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: lovestory_db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: lovestory
-      POSTGRES_PASSWORD: lovestory
-      POSTGRES_DB: lovestory
-    ports:
-      - "5432:5432"
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lovestory"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # Optional local S3 — comment out if using a real bucket in dev.
   minio:
     image: minio/minio:latest
     container_name: lovestory_minio
@@ -35,5 +17,4 @@ services:
       - minio_data:/data
 
 volumes:
-  db_data:
   minio_data:

@@ -1,32 +1,33 @@
-// Riverside guest house — data model.
-// Money is stored as integer minor units (cents). Dates use @db.Date (no TZ) for stay nights.
-// The CONFIRMED-booking overlap exclusion constraint is added in a manual migration
-// (Prisma can't express btree_gist exclusion constraints yet) — see migrations + product-design.md §6.
+// Riverside guest house — data model (SQLite).
+// Single property, low traffic: SQLite keeps the stack to one file, no DB server.
+// Money is stored as integer minor units (cents). Stay dates are DateTime, normalized to
+// date-only in app code (see src/lib/dates.ts).
+//
+// SQLite vs Postgres notes (why this schema avoids some Prisma features):
+//   - SQLite has no native ENUM type → "enum" fields are String, validated by Zod at the edge.
+//     Allowed values are documented in a comment next to each such field.
+//   - SQLite has no scalar lists → PriceRule.daysOfWeek is a CSV String (e.g. "5,6").
+//   - SQLite has no JSON column defaults we rely on → JSON is stored as String ("{}").
+//   - No btree_gist, so the "no overlapping CONFIRMED bookings" rule is enforced in a
+//     transaction in booking.service.ts (confirmBooking), not by a DB constraint.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
 }
 
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
-enum Role {
-  OWNER
-  MANAGER
-  EDITOR
-}
-
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
   passwordHash String
   name         String
-  role         Role      @default(OWNER)
+  role         String    @default("OWNER") // OWNER | MANAGER | EDITOR
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
@@ -40,30 +41,17 @@ model User {
 // ---------------------------------------------------------------------------
 // Booking
 // ---------------------------------------------------------------------------
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  DECLINED
-  EXPIRED
-  CANCELLED
-}
-
-enum BookingSource {
-  WEBSITE
-  MANUAL
-}
-
 model Booking {
-  id          String        @id @default(cuid())
-  reference   String        @unique
+  id          String   @id @default(cuid())
+  reference   String   @unique
   guestName   String
   guestPhone  String
   guestEmail  String?
-  guestsCount Int           @default(2)
-  checkIn     DateTime      @db.Date // inclusive
-  checkOut    DateTime      @db.Date // exclusive (half-open [checkIn, checkOut))
-  status      BookingStatus @default(PENDING)
-  source      BookingSource @default(WEBSITE)
+  guestsCount Int      @default(2)
+  checkIn     DateTime // inclusive, date-only in practice
+  checkOut    DateTime // exclusive (half-open [checkIn, checkOut))
+  status      String   @default("PENDING") // PENDING | CONFIRMED | DECLINED | EXPIRED | CANCELLED
+  source      String   @default("WEBSITE") // WEBSITE | MANUAL
 
   priceQuoteMinor Int
   currency        String @default("USD")
@@ -74,9 +62,9 @@ model Booking {
   appliedPromotionId String?
   appliedPromotion   Promotion? @relation(fields: [appliedPromotionId], references: [id])
 
-  confirmedAt DateTime?
+  confirmedAt   DateTime?
   confirmedById String?
-  confirmedBy   User?    @relation("ConfirmedBy", fields: [confirmedById], references: [id])
+  confirmedBy   User?     @relation("ConfirmedBy", fields: [confirmedById], references: [id])
 
   addons    BookingAddon[]
   createdAt DateTime       @default(now())
@@ -87,14 +75,14 @@ model Booking {
 }
 
 model CalendarBlock {
-  id        String   @id @default(cuid())
-  startDate DateTime @db.Date
-  endDate   DateTime @db.Date // exclusive
-  reason    String?
+  id          String   @id @default(cuid())
+  startDate   DateTime
+  endDate     DateTime // exclusive
+  reason      String?
   createdById String?
-  createdBy   User?  @relation(fields: [createdById], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([startDate, endDate])
 }
@@ -102,32 +90,20 @@ model CalendarBlock {
 // ---------------------------------------------------------------------------
 // Pricing
 // ---------------------------------------------------------------------------
-enum PriceKind {
-  BASE
-  WEEKEND
-  SEASONAL
-}
-
 model PriceRule {
-  id              String    @id @default(cuid())
-  name            String
-  kind            PriceKind
+  id               String    @id @default(cuid())
+  name             String
+  kind             String // BASE | WEEKEND | SEASONAL
   nightlyRateMinor Int
-  currency        String    @default("USD")
-  appliesFrom     DateTime? @db.Date // SEASONAL only
-  appliesTo       DateTime? @db.Date // SEASONAL only
-  daysOfWeek      Int[]     @default([]) // WEEKEND: e.g. [5,6] (Fri,Sat)
-  minNights       Int?
-  priority        Int       @default(0) // higher wins on overlap
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-}
-
-enum AddonUnit {
-  PER_STAY
-  PER_NIGHT
-  PER_PERSON
+  currency         String    @default("USD")
+  appliesFrom      DateTime? // SEASONAL only
+  appliesTo        DateTime? // SEASONAL only
+  daysOfWeek       String    @default("") // WEEKEND: CSV of weekday numbers, e.g. "5,6" (Fri,Sat)
+  minNights        Int?
+  priority         Int       @default(0) // higher wins on overlap
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model Addon {
@@ -136,7 +112,7 @@ model Addon {
   description String?
   priceMinor  Int
   currency    String         @default("USD")
-  unit        AddonUnit      @default(PER_STAY)
+  unit        String         @default("PER_STAY") // PER_STAY | PER_NIGHT | PER_PERSON
   isActive    Boolean        @default(true)
   sortOrder   Int            @default(0)
   bookings    BookingAddon[]
@@ -159,138 +135,106 @@ model BookingAddon {
 // ---------------------------------------------------------------------------
 // Marketing / content
 // ---------------------------------------------------------------------------
-enum DiscountType {
-  PERCENT
-  FIXED
-  PACKAGE
-}
-
 model Promotion {
-  id            String       @id @default(cuid())
+  id            String    @id @default(cuid())
   title         String
-  slug          String       @unique
+  slug          String    @unique
   body          String
   imageMediaId  String?
-  imageMedia    Media?       @relation(fields: [imageMediaId], references: [id])
-  discountType  DiscountType @default(PERCENT)
-  discountValue Int? // percent or minor units depending on type
-  validFrom     DateTime?    @db.Date
-  validTo       DateTime?    @db.Date
-  isActive      Boolean      @default(true)
-  sortOrder     Int          @default(0)
+  imageMedia    Media?    @relation(fields: [imageMediaId], references: [id])
+  discountType  String    @default("PERCENT") // PERCENT | FIXED | PACKAGE
+  discountValue Int? // percent, or minor units depending on type
+  validFrom     DateTime?
+  validTo       DateTime?
+  isActive      Boolean   @default(true)
+  sortOrder     Int       @default(0)
   bookings      Booking[]
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-}
-
-enum ReviewStatus {
-  PENDING
-  APPROVED
-  HIDDEN
-}
-
-enum ReviewSource {
-  WEBSITE
-  IMPORTED
-  SOCIAL
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model Review {
-  id         String       @id @default(cuid())
-  authorName String
-  rating     Int // 1..5
-  title      String?
-  body       String
-  stayMonth  String? // free text e.g. "August 2025"
-  status     ReviewStatus @default(PENDING)
-  source     ReviewSource @default(WEBSITE)
-  ownerReply String?
-  approvedAt DateTime?
+  id           String    @id @default(cuid())
+  authorName   String
+  rating       Int // 1..5
+  title        String?
+  body         String
+  stayMonth    String? // free text e.g. "August 2025"
+  status       String    @default("PENDING") // PENDING | APPROVED | HIDDEN
+  source       String    @default("WEBSITE") // WEBSITE | IMPORTED | SOCIAL
+  ownerReply   String?
+  approvedAt   DateTime?
   approvedById String?
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([status])
 }
 
-enum MediaType {
-  IMAGE
-  VIDEO
-}
-
-enum MediaCategory {
-  HOUSE
-  RIVER
-  BBQ
-  TUB
-  NATURE
-  OTHER
-}
-
 model Media {
-  id           String        @id @default(cuid())
-  type         MediaType     @default(IMAGE)
+  id           String      @id @default(cuid())
+  type         String      @default("IMAGE") // IMAGE | VIDEO
   storageKey   String // S3/R2 object key
   url          String
   thumbnailUrl String?
   title        String?
-  altText      String        @default("") // required for IMAGE (enforced in service)
-  category     MediaCategory @default(OTHER)
+  altText      String      @default("") // required for IMAGE (enforced in service)
+  category     String      @default("OTHER") // HOUSE | RIVER | BBQ | TUB | NATURE | OTHER
   width        Int?
   height       Int?
   durationSec  Int?
-  sortOrder    Int           @default(0)
-  isHero       Boolean       @default(false)
-  isActive     Boolean       @default(true)
+  sortOrder    Int         @default(0)
+  isHero       Boolean     @default(false)
+  isActive     Boolean     @default(true)
   promotions   Promotion[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   @@index([category, isActive, sortOrder])
 }
 
 // Editable site copy. key e.g. "hero.headline". Seeded with defaults.
 model ContentBlock {
-  id        String   @id @default(cuid())
-  key       String
-  locale    String   @default("en")
-  value     String
+  id          String   @id @default(cuid())
+  key         String
+  locale      String   @default("en")
+  value       String
   updatedById String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([key, locale])
 }
 
 // Singleton settings row (id = "default").
 model SiteSettings {
-  id                  String   @id @default("default")
-  propertyName        String   @default("LoveStory Riverside Retreat")
-  capacity            Int      @default(4)
-  areaSqm             Int      @default(60)
-  phone               String   @default("")
-  whatsapp            String?
-  email               String   @default("")
-  address             String   @default("")
-  lat                 Float?
-  lng                 Float?
-  mapEmbed            String?
-  notificationEmail   String   @default("")
-  notificationChannels Json    @default("{}")
-  socialLinks         Json     @default("{}")
-  currency            String   @default("USD")
-  timezone            String   @default("UTC")
-  updatedAt           DateTime @updatedAt
+  id                   String   @id @default("default")
+  propertyName         String   @default("LoveStory Riverside Retreat")
+  capacity             Int      @default(4)
+  areaSqm              Int      @default(60)
+  phone                String   @default("")
+  whatsapp             String?
+  email                String   @default("")
+  address              String   @default("")
+  lat                  Float?
+  lng                  Float?
+  mapEmbed             String?
+  notificationEmail    String   @default("")
+  notificationChannels String   @default("{}") // JSON string
+  socialLinks          String   @default("{}") // JSON string
+  currency             String   @default("USD")
+  timezone             String   @default("UTC")
+  updatedAt            DateTime @updatedAt
 }
 
 model AuditLog {
-  id       String   @id @default(cuid())
-  actorId  String?
-  actor    User?    @relation(fields: [actorId], references: [id])
-  action   String
-  entity   String
-  entityId String?
-  meta     Json     @default("{}")
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  meta      String   @default("{}") // JSON string
   createdAt DateTime @default(now())
 
   @@index([entity, entityId])

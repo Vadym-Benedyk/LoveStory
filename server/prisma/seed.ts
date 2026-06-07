@@ -61,7 +61,7 @@ async function main() {
           kind: 'WEEKEND',
           nightlyRateMinor: 15000,
           currency: CURRENCY,
-          daysOfWeek: [5, 6],
+          daysOfWeek: '5,6',
           priority: 10,
         },
       ],

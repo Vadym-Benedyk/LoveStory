@@ -1,15 +1,42 @@
+# dependencies
 node_modules/
-.DS_Store
-.idea/
+
+# builds
 dist/
 build/
-*.log
+client/dist/
+server/dist/
+*.tsbuildinfo
+
+# env & secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+
+# SQLite database files
+server/prisma/*.db
+server/prisma/*.db-journal
+server/prisma/*.db-wal
+server/prisma/*.db-shm
+
+# logs
+*.log
+npm-debug.log*
+logs/
 
 # npm cache (local)
 .npmcache/
 
+# editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
 # Claude local settings
 .claude/settings.local.json
+
+# misc
+coverage/
+.cache/
+tmp/

@@ -64,7 +64,8 @@ adminBookingRouter.get(
 adminBookingRouter.post(
   '/:id/confirm',
   asyncHandler(async (req, res) => {
-    const booking = await service.confirmBooking(req.params.id, req.user!.id);
+    const id = req.params.id as string;
+    const booking = await service.confirmBooking(id, req.user!.id);
     const conflicts = await service.flagConflictingPendings(
       booking.id,
       booking.checkIn,
@@ -78,12 +79,13 @@ adminBookingRouter.patch(
   '/:id/status',
   validate({ body: updateStatusSchema }),
   asyncHandler(async (req, res) => {
+    const id = req.params.id as string;
     const { status, internalNotes } = req.body;
     if (status === 'CONFIRMED') {
-      const booking = await service.confirmBooking(req.params.id, req.user!.id);
+      const booking = await service.confirmBooking(id, req.user!.id);
       return res.json({ booking });
     }
-    const booking = await service.setStatus(req.params.id, status, req.user!.id, internalNotes);
+    const booking = await service.setStatus(id, status, req.user!.id, internalNotes);
     res.json({ booking });
   }),
 );

@@ -8,9 +8,9 @@ panel with a **request → manual phone confirmation → calendar block** bookin
 ## Stack
 
 - **Frontend:** React + Vite + TypeScript, MUI + SCSS Modules (`client/`)
-- **Backend:** Node.js + Express + TypeScript, Prisma + PostgreSQL (`server/`)
-- **Storage:** S3-compatible (Cloudflare R2 / AWS S3 / MinIO locally)
-- **Deploy:** single Docker image → any cheap Docker host (Railway / Render / VPS)
+- **Backend:** Node.js + Express + TypeScript, Prisma + **SQLite** (`server/`)
+- **Storage:** S3-compatible (Cloudflare R2 / AWS S3 / MinIO locally) — optional, for gallery
+- **Deploy:** single Docker image → any cheap Docker host (Railway / Render / VPS) with a persistent disk for the SQLite file
 
 ## Docs (read these first)
 
@@ -24,30 +24,33 @@ panel with a **request → manual phone confirmation → calendar block** bookin
 # 1. install (npm workspaces)
 npm install
 
-# 2. start local Postgres (+ MinIO)
-npm run db:up
-
-# 3. configure env
+# 2. configure env
 cp server/.env.example server/.env
 cp client/.env.example client/.env
 
-# 4. migrate + seed
-npm run migrate
+# 3. create the SQLite DB from the schema, then seed it
+npm run migrate   # prisma db push — creates server/prisma/dev.db
 npm run seed
 
-# 5. run both apps
+# 4. run both apps
 npm run dev
 # client → http://localhost:5173   api → http://localhost:4000
 # admin  → http://localhost:5173/admin
+
+# (optional) local S3 for gallery uploads:
+# npm run storage:up
 ```
+
+> No database server to start — SQLite is just a file (`server/prisma/dev.db`).
+> Schema changes are applied with `npm run db:sync` (Prisma `db push`).
 
 ## Repo layout
 
 ```
 client/   React + Vite + MUI + SCSS (public site + code-split admin bundle)
-server/   Express + Prisma API (domain modules)
+server/   Express + Prisma API (domain modules); SQLite db at prisma/dev.db
 docs/     planning & design documentation
-docker-compose.yml   local Postgres + MinIO
+docker-compose.yml   optional local MinIO (S3) for gallery uploads
 ```
 
 ## Booking model (the one rule to remember)

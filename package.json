@@ -20,10 +20,12 @@
     "build:server": "npm --workspace server run build",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "npm --workspace client run typecheck && npm --workspace server run typecheck",
-    "db:up": "docker compose up -d db",
-    "db:down": "docker compose down",
-    "migrate": "npm --workspace server run prisma:migrate",
+    "storage:up": "docker compose up -d minio",
+    "storage:down": "docker compose down",
+    "db:sync": "npm --workspace server run prisma:push",
+    "migrate": "npm --workspace server run prisma:push",
     "seed": "npm --workspace server run prisma:seed",
+    "test": "npm --workspace server run test",
     "format": "prettier --write \"**/*.{ts,tsx,scss,json,md}\""
   },
   "devDependencies": {

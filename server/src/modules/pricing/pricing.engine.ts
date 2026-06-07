@@ -27,6 +27,14 @@ export interface QuoteResult {
   meetsMinNights: boolean;
 }
 
+// daysOfWeek is stored as a CSV string under SQLite (e.g. "5,6"). Parse to numbers.
+function parseDays(csv: string): number[] {
+  return csv
+    .split(',')
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n));
+}
+
 // Pick the highest-priority active rule that applies to a given night.
 function resolveNightRule(date: Date, rules: PriceRule[]): PriceRule | undefined {
   const base = rules.find((r) => r.kind === 'BASE' && r.isActive);
@@ -38,7 +46,9 @@ function resolveNightRule(date: Date, rules: PriceRule[]): PriceRule | undefined
         return toDateOnly(date) >= toDateOnly(r.appliesFrom) && toDateOnly(date) < toDateOnly(r.appliesTo);
       }
       if (r.kind === 'WEEKEND') {
-        return isWeekend(date, r.daysOfWeek.length ? r.daysOfWeek : [5, 6]);
+        // String() handles the SQLite CSV ("5,6") and is defensive across schema versions.
+        const days = parseDays(String(r.daysOfWeek));
+        return isWeekend(date, days.length ? days : [5, 6]);
       }
       return false; // BASE handled as fallback
     })

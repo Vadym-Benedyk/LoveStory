@@ -1,8 +1,10 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import type { Role } from '@prisma/client';
 import { env } from '../config/env.js';
 import { Forbidden, Unauthorized } from '../lib/errors.js';
+
+// SQLite has no enums, so role is a String column. Keep a narrow union in app code.
+export type Role = 'OWNER' | 'MANAGER' | 'EDITOR';
 
 export interface AuthUser {
   id: string;

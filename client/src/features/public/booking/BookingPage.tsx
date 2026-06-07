@@ -19,11 +19,13 @@ import { useMutation } from '@tanstack/react-query';
 import { api } from '@/shared/api/client';
 import { useAvailability } from '@/shared/api/queries';
 import { formatMoney, type Quote } from '@/shared/types';
+import { useLanguage } from '@/i18n/LanguageContext';
 import styles from './BookingPage.module.scss';
 
 const fmt = (d: Dayjs) => d.format('YYYY-MM-DD');
 
 export function BookingPage() {
+  const { t } = useLanguage();
   const [checkIn, setCheckIn] = useState<Dayjs | null>(null);
   const [checkOut, setCheckOut] = useState<Dayjs | null>(null);
   const [form, setForm] = useState({ guestName: '', guestPhone: '', guestEmail: '', comments: '', website: '' });
@@ -101,14 +103,13 @@ export function BookingPage() {
       <Container className={styles.page}>
         <Paper className={styles.confirm} elevation={0}>
           <Typography variant="h3" gutterBottom>
-            Request received
+            {t('booking.success.title')}
           </Typography>
           <Typography>
-            {bookingMut.data.message} Your reference is{' '}
-            <strong>{bookingMut.data.reference}</strong>.
+            {t('booking.success.ref')} <strong>{bookingMut.data.reference}</strong>.
           </Typography>
           <Alert severity="info" sx={{ mt: 3 }}>
-            Nothing is booked yet — the owner will call you to confirm these dates.
+            {t('booking.success.note')}
           </Alert>
         </Paper>
       </Container>
@@ -118,12 +119,9 @@ export function BookingPage() {
   return (
     <Container className={styles.page}>
       <Typography variant="h2" gutterBottom>
-        Request your stay
+        {t('booking.title')}
       </Typography>
-      <Typography className={styles.intro}>
-        Pick your dates, then send a request. We confirm every reservation personally by phone —
-        your dates are only held once we&apos;ve spoken.
-      </Typography>
+      <Typography className={styles.intro}>{t('booking.intro')}</Typography>
 
       <Grid container spacing={4}>
         <Grid item xs={12} md={7}>
@@ -137,12 +135,16 @@ export function BookingPage() {
               />
             </LocalizationProvider>
             <Stack direction="row" spacing={2} className={styles.legend}>
-              <span><i className={styles.dotAvailable} /> Available</span>
-              <span><i className={styles.dotBlocked} /> Unavailable</span>
+              <span><i className={styles.dotAvailable} /> {t('booking.legend.available')}</span>
+              <span><i className={styles.dotBlocked} /> {t('booking.legend.unavailable')}</span>
             </Stack>
             <Typography variant="body2">
-              {checkIn ? `Check-in: ${fmt(checkIn)}` : 'Select your check-in date'}
-              {checkOut ? ` · Check-out: ${fmt(checkOut)}` : checkIn ? ' · now select check-out' : ''}
+              {checkIn ? `${t('booking.checkin')}: ${fmt(checkIn)}` : t('booking.selectCheckin')}
+              {checkOut
+                ? ` · ${t('booking.checkout')}: ${fmt(checkOut)}`
+                : checkIn
+                  ? ` · ${t('booking.nowSelectCheckout')}`
+                  : ''}
             </Typography>
           </Paper>
         </Grid>
@@ -152,14 +154,14 @@ export function BookingPage() {
             {quoteMut.data && (
               <Box className={styles.quote}>
                 <Typography variant="h6">
-                  {quoteMut.data.nights} night{quoteMut.data.nights > 1 ? 's' : ''}
+                  {quoteMut.data.nights} {t('booking.nights')}
                 </Typography>
                 <Typography variant="h4">
                   {formatMoney(quoteMut.data.totalMinor, quoteMut.data.currency)}
                 </Typography>
                 {!quoteMut.data.meetsMinNights && (
                   <Alert severity="warning" sx={{ mt: 1 }}>
-                    Minimum stay is {quoteMut.data.minNights} nights for these dates.
+                    {t('booking.minStay', { n: quoteMut.data.minNights ?? 0 })}
                   </Alert>
                 )}
                 <Divider sx={{ my: 2 }} />
@@ -168,24 +170,24 @@ export function BookingPage() {
 
             <Stack spacing={2}>
               <TextField
-                label="Your name"
+                label={t('booking.form.name')}
                 required
                 value={form.guestName}
                 onChange={(e) => setForm({ ...form, guestName: e.target.value })}
               />
               <TextField
-                label="Phone number"
+                label={t('booking.form.phone')}
                 required
                 value={form.guestPhone}
                 onChange={(e) => setForm({ ...form, guestPhone: e.target.value })}
               />
               <TextField
-                label="Email (optional)"
+                label={t('booking.form.email')}
                 value={form.guestEmail}
                 onChange={(e) => setForm({ ...form, guestEmail: e.target.value })}
               />
               <TextField
-                label="Anything we should know? (optional)"
+                label={t('booking.form.comments')}
                 multiline
                 minRows={2}
                 value={form.comments}
@@ -202,13 +204,12 @@ export function BookingPage() {
               />
               <label className={styles.consent}>
                 <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-                <span>I agree to be contacted by phone to confirm this request.</span>
+                <span>{t('booking.form.consent')}</span>
               </label>
 
               {bookingMut.isError && (
                 <Alert severity="error">
-                  {(bookingMut.error as any)?.response?.data?.error?.message ??
-                    'Could not submit. Please try again.'}
+                  {(bookingMut.error as any)?.response?.data?.error?.message ?? t('booking.error')}
                 </Alert>
               )}
 
@@ -218,10 +219,10 @@ export function BookingPage() {
                 disabled={!canSubmit || bookingMut.isPending}
                 onClick={() => bookingMut.mutate()}
               >
-                {bookingMut.isPending ? 'Sending…' : 'Send booking request'}
+                {bookingMut.isPending ? t('booking.sending') : t('booking.submit')}
               </Button>
               <Typography variant="caption" color="text.secondary">
-                This sends a request only. No payment is taken now.
+                {t('booking.noPayment')}
               </Typography>
             </Stack>
           </Paper>
