@@ -1,3 +1,4 @@
+import { useFormatDate } from '@/i18n/DateLocaleProvider';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -13,8 +14,6 @@ import {
   Typography,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { PickersDay, type PickersDayProps } from '@mui/x-date-pickers/PickersDay';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -25,6 +24,7 @@ import { useAvailability, useSiteContent } from '@/shared/api/queries';
 import type { Quote } from '@/shared/types';
 import { usePrice } from '@/shared/usePrice';
 import { PhoneMaskInput, isCompleteUaPhone } from '@/shared/ui/PhoneMaskInput';
+import { roomyCalendarSx } from '@/shared/ui/calendarSx';
 import { useLanguage } from '@/i18n/LanguageContext';
 import styles from './BookingPage.module.scss';
 
@@ -64,6 +64,7 @@ function RangeDay({ rangeStart, rangeEnd, day, ...other }: RangeDayProps) {
 export function BookingPage() {
   const { t, tp } = useLanguage();
   const price = usePrice();
+  const fmtDate = useFormatDate();
   // The guest picks NIGHTS: one click = one night; a second, later click = last night of the
   // stay. Check-out is the morning after the last night.
   const [firstNight, setFirstNight] = useState<Dayjs | null>(null);
@@ -209,7 +210,6 @@ export function BookingPage() {
       <Grid container spacing={4}>
         <Grid item xs={12} md={7}>
           <Paper elevation={0} className={styles.calendarCard}>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DateCalendar
                 disablePast
                 shouldDisableDate={isDisabled}
@@ -217,30 +217,10 @@ export function BookingPage() {
                 // Selection is drawn by RangeDay; keeping the picker's own value empty makes
                 // every click (even on an already highlighted day) reach handleDay.
                 value={null}
-                // MUI's calendar is a fixed 320×336px. Phones: let it shrink (day side-margins
-                // dropped) so it never forces horizontal scroll. Tablet/desktop: bigger day cells
-                // (52 / 56px) so the calendar fills its card. Row = cell + 4px (MUI week margin).
-                sx={{
-                  width: '100%',
-                  maxWidth: { xs: 320, sm: 400, md: 440 },
-                  height: 'auto',
-                  maxHeight: 'none',
-                  '& .MuiPickersDay-root, & .MuiDayCalendar-weekDayLabel': {
-                    mx: { xs: 0, sm: '2px' },
-                    width: { xs: 36, sm: 52, md: 56 },
-                  },
-                  '& .MuiPickersDay-root': {
-                    height: { xs: 36, sm: 52, md: 56 },
-                    fontSize: { xs: '0.75rem', sm: '0.95rem', md: '1rem' },
-                  },
-                  '& .MuiDayCalendar-weekDayLabel': { fontSize: { sm: '0.85rem' } },
-                  '& .MuiDayCalendar-slideTransition': { minHeight: { xs: 240, sm: 336, md: 360 } },
-                  '& .MuiPickersCalendarHeader-label': { fontSize: { sm: '1.05rem', md: '1.15rem' } },
-                }}
+                sx={roomyCalendarSx}
                 slots={{ day: RangeDay }}
                 slotProps={{ day: { rangeStart: firstNight, rangeEnd: lastNight } as Partial<RangeDayProps> }}
               />
-            </LocalizationProvider>
             <Stack direction="row" spacing={2} className={styles.legend}>
               <span><i className={styles.dotAvailable} /> {t('booking.legend.available')}</span>
               <span><i className={styles.dotBlocked} /> {t('booking.legend.unavailable')}</span>
@@ -248,8 +228,8 @@ export function BookingPage() {
             {checkIn && checkOut ? (
               <>
                 <Typography variant="body2" fontWeight={600}>
-                  {t('booking.checkin')}: {checkIn.format('DD.MM.YYYY')} · {t('booking.checkout')}:{' '}
-                  {checkOut.format('DD.MM.YYYY')} · {tp('booking.nightsCount', checkOut.diff(checkIn, 'day'))}
+                  {t('booking.checkin')}: {fmtDate(checkIn)} · {t('booking.checkout')}:{' '}
+                  {fmtDate(checkOut)} · {tp('booking.nightsCount', checkOut.diff(checkIn, 'day'))}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {t(checkOut.diff(checkIn, 'day') === 1 ? 'booking.hintExtend' : 'booking.hintRestart')}

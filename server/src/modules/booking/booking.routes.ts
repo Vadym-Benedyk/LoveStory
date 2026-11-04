@@ -7,9 +7,12 @@ import { toDateOnly } from '../../lib/dates.js';
 import { getUnavailableRanges } from '../availability/availability.service.js';
 import * as service from './booking.service.js';
 import {
+  adminCreateBookingSchema,
   availabilityQuerySchema,
   createBookingSchema,
+  listBookingsQuerySchema,
   quoteSchema,
+  updateNotesSchema,
   updateStatusSchema,
 } from './booking.schema.js';
 
@@ -56,8 +59,19 @@ adminBookingRouter.use(requireAuth, requireRole('OWNER', 'MANAGER'));
 
 adminBookingRouter.get(
   '/',
+  validate({ query: listBookingsQuerySchema }),
   asyncHandler(async (req, res) => {
-    res.json(await service.listBookings(req.query.status as string | undefined));
+    const { status, period } = req.query as { status?: string; period?: service.BookingPeriod };
+    res.json(await service.listBookings(status, period));
+  }),
+);
+
+// Manual booking by the owner/manager (phone or walk-in guest).
+adminBookingRouter.post(
+  '/',
+  validate({ body: adminCreateBookingSchema }),
+  asyncHandler(async (req, res) => {
+    res.status(201).json(await service.createManualBooking(req.body, req.user!.id));
   }),
 );
 
@@ -72,6 +86,16 @@ adminBookingRouter.post(
       booking.checkOut,
     );
     res.json({ booking, conflictingPendingIds: conflicts });
+  }),
+);
+
+// Manager's private note (editable from the booking details panel).
+adminBookingRouter.patch(
+  '/:id',
+  validate({ body: updateNotesSchema }),
+  asyncHandler(async (req, res) => {
+    const id = req.params.id as string;
+    res.json(await service.updateInternalNotes(id, req.body.internalNotes, req.user!.id));
   }),
 );
 

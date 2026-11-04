@@ -9,6 +9,7 @@ import '@fontsource/inter/600.css';
 import { theme } from '@/theme/theme';
 import { App } from '@/app/App';
 import { LanguageProvider } from '@/i18n/LanguageContext';
+import { DateLocaleProvider } from '@/i18n/DateLocaleProvider';
 import '@/styles/global.scss';
 
 const queryClient = new QueryClient({
@@ -26,9 +27,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <LanguageProvider>
-            <BrowserRouter>
-              <App />
-            </BrowserRouter>
+            <DateLocaleProvider>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+            </DateLocaleProvider>
           </LanguageProvider>
         </ThemeProvider>
       </QueryClientProvider>

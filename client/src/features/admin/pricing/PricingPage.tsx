@@ -1,3 +1,4 @@
+import { useFormatDate } from '@/i18n/DateLocaleProvider';
 import { useState } from 'react';
 import {
   Box,
@@ -25,8 +26,6 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
 import { usePrice } from '@/shared/usePrice';
@@ -92,6 +91,7 @@ export function PricingPage() {
     usePricingActions();
 
   const price = usePrice();
+  const fmtDate = useFormatDate();
   const currency = price.currencyLabel;
 
   const [ruleDialogId, setRuleDialogId] = useState<string | null | undefined>(undefined);
@@ -184,7 +184,7 @@ export function PricingPage() {
     }
     if (r.kind === 'SEASONAL') {
       return r.appliesFrom && r.appliesTo
-        ? `${r.appliesFrom.slice(0, 10)} → ${r.appliesTo.slice(0, 10)}`
+        ? `${fmtDate(r.appliesFrom)} → ${fmtDate(r.appliesTo)}`
         : '—';
     }
     return '—';
@@ -211,7 +211,7 @@ export function PricingPage() {
             {(data?.rules.length ?? 0) === 0 ? (
               <Typography color="text.secondary">{t('admin.pricing.empty')}</Typography>
             ) : (
-              <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3 }}>
+              <TableContainer component={Paper} elevation={0}>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
@@ -275,7 +275,7 @@ export function PricingPage() {
             {(data?.addons.length ?? 0) === 0 ? (
               <Typography color="text.secondary">{t('admin.pricing.addonsEmpty')}</Typography>
             ) : (
-              <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3 }}>
+              <TableContainer component={Paper} elevation={0}>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
@@ -378,7 +378,6 @@ export function PricingPage() {
             )}
 
             {ruleForm.kind === 'SEASONAL' && (
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <Stack direction="row" spacing={2}>
                   <DatePicker
                     label={t('admin.pricing.from')}
@@ -394,7 +393,6 @@ export function PricingPage() {
                     slotProps={{ textField: { fullWidth: true } }}
                   />
                 </Stack>
-              </LocalizationProvider>
             )}
 
             <TextField

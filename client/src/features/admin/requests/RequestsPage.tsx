@@ -1,3 +1,4 @@
+import { useFormatDate } from '@/i18n/DateLocaleProvider';
 import {
   Box,
   Button,
@@ -13,11 +14,11 @@ import { api } from '@/shared/api/client';
 import type { Booking } from '@/shared/types';
 import { usePrice } from '@/shared/usePrice';
 import { useLanguage } from '@/i18n/LanguageContext';
-import { OverCapacityChip } from '../OverCapacityChip';
 
 export function RequestsPage() {
   const { t } = useLanguage();
   const price = usePrice();
+  const fmtDate = useFormatDate();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'bookings', 'PENDING'],
@@ -55,11 +56,10 @@ export function RequestsPage() {
               </Stack>
               <Typography variant="body2" color="text.secondary">
                 {t('admin.requests.datesGuests', {
-                  checkIn: b.checkIn.slice(0, 10),
-                  checkOut: b.checkOut.slice(0, 10),
+                  checkIn: fmtDate(b.checkIn),
+                  checkOut: fmtDate(b.checkOut),
                   count: b.guestsCount,
                 })}
-                <OverCapacityChip guests={b.guestsCount} />
               </Typography>
               <Typography variant="body2" sx={{ my: 1 }}>
                 {t('admin.requests.quote', { amount: price.format(b.priceQuoteMinor) })}

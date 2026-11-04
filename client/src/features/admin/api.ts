@@ -17,11 +17,14 @@ export interface AdminCalendar {
 }
 
 // ---- Bookings ----
-export const useBookings = (status?: string) =>
+export type BookingPeriod = 'week' | 'month' | 'year';
+
+// status / period are optional filters (period = created within the last week / month / year).
+export const useBookings = (status?: string, period?: BookingPeriod) =>
   useQuery({
-    queryKey: ['admin', 'bookings', status ?? 'ALL'],
+    queryKey: ['admin', 'bookings', status ?? 'ALL', period ?? 'ALL'],
     queryFn: async () =>
-      (await api.get<Booking[]>('/admin/bookings', { params: status ? { status } : {} })).data,
+      (await api.get<Booking[]>('/admin/bookings', { params: { status, period } })).data,
   });
 
 export function useBookingActions() {
@@ -46,6 +49,47 @@ export function useBookingActions() {
   });
 
   return { confirm, setStatus };
+}
+
+// Manager's private note on a booking.
+export function useUpdateBookingNotes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { id: string; internalNotes: string | null }) =>
+      (await api.patch<Booking>(`/admin/bookings/${vars.id}`, { internalNotes: vars.internalNotes })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'bookings'] }),
+  });
+}
+
+// Manual booking (phone / walk-in guest). Confirmed by default; priceMinor overrides the quote.
+export interface NewBookingInput {
+  guestName: string;
+  guestPhone: string;
+  guestEmail?: string;
+  guestsCount: number;
+  checkIn: string;
+  checkOut: string;
+  status: 'CONFIRMED' | 'PENDING';
+  priceMinor?: number;
+  internalNotes?: string;
+}
+
+export function useCreateBooking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: NewBookingInput) =>
+      (
+        await api.post<{ booking: Booking; quotedMinor: number; conflictingPendingIds: string[] }>(
+          '/admin/bookings',
+          input,
+        )
+      ).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'bookings'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'calendar'] });
+      qc.invalidateQueries({ queryKey: ['availability'] });
+    },
+  });
 }
 
 // ---- Calendar ----

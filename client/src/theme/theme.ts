@@ -10,6 +10,13 @@ const tokens = {
   river: '#5b7e8c',
 };
 
+const alertColors = {
+  error: '#b3412f',
+  warning: '#c8841f',
+  success: tokens.forest,
+  info: tokens.river,
+} as const;
+
 export const theme = createTheme({
   palette: {
     primary: { main: tokens.forest },
@@ -32,6 +39,26 @@ export const theme = createTheme({
   components: {
     MuiButton: { defaultProps: { disableElevation: true }, styleOverrides: { root: { borderRadius: 999, paddingInline: 22 } } },
     MuiPaper: { styleOverrides: { root: { backgroundImage: 'none' } } },
+    // Calm alerts: a white card with a hairline border and a colored stripe on the left, instead
+    // of MUI's tinted (pink for errors) fill. Only the stripe and icon carry the severity color.
+    MuiAlert: {
+      styleOverrides: {
+        // `standard` only: the `filled` variant (success toast after creating a booking) keeps
+        // MUI's solid colors.
+        root: { alignItems: 'center' },
+        standard: {
+          backgroundColor: '#fff',
+          color: tokens.bark,
+          border: '1px solid rgba(43, 38, 32, 0.12)',
+          borderLeftWidth: 4,
+          borderRadius: 12,
+        },
+        standardError: { borderLeftColor: alertColors.error, '& .MuiAlert-icon': { color: alertColors.error } },
+        standardWarning: { borderLeftColor: alertColors.warning, '& .MuiAlert-icon': { color: alertColors.warning } },
+        standardSuccess: { borderLeftColor: alertColors.success, '& .MuiAlert-icon': { color: alertColors.success } },
+        standardInfo: { borderLeftColor: alertColors.info, '& .MuiAlert-icon': { color: alertColors.info } },
+      },
+    },
   },
 });
 

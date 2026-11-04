@@ -1,3 +1,4 @@
+import { useFormatDate } from '@/i18n/DateLocaleProvider';
 import { useMemo, useState } from 'react';
 import {
   Alert,
@@ -12,15 +13,15 @@ import {
   Typography,
 } from '@mui/material';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { PickersDay, type PickersDayProps } from '@mui/x-date-pickers/PickersDay';
 import dayjs, { type Dayjs } from 'dayjs';
 import { statusColors } from '@/theme/theme';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { roomyCalendarSx } from '@/shared/ui/calendarSx';
 import { useAdminCalendar, useBlockActions } from '../api';
+import { NewBookingButton } from '../bookings/NewBookingButton';
 
 const fmt = (d: Dayjs) => d.format('YYYY-MM-DD');
 
@@ -40,6 +41,7 @@ function daysOf(ranges: { start: string; end: string }[]): Set<string> {
 
 export function CalendarPage() {
   const { t } = useLanguage();
+  const fmtDate = useFormatDate();
   const rangeStart = dayjs().startOf('month');
   const rangeEnd = dayjs().add(6, 'month').endOf('month');
   const { data, isLoading } = useAdminCalendar(fmt(rangeStart), fmt(rangeEnd));
@@ -102,11 +104,9 @@ export function CalendarPage() {
       </Typography>
 
       <Grid container spacing={3}>
-        <Grid item xs={12} md={7}>
+        <Grid item xs={12} lg={7}>
           <Paper elevation={0} sx={{ p: 2, borderRadius: 3 }}>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
-              <DateCalendar readOnly slots={{ day: Day }} />
-            </LocalizationProvider>
+              <DateCalendar readOnly slots={{ day: Day }} sx={roomyCalendarSx} />
             <Stack direction="row" spacing={2} sx={{ px: 2, pb: 1, flexWrap: 'wrap', fontSize: 14 }}>
               <LegendDot color={statusColors.confirmed} label={t('admin.calendar.legendConfirmed')} />
               <LegendDot color={statusColors.pending} label={t('admin.calendar.legendPending')} />
@@ -115,7 +115,7 @@ export function CalendarPage() {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={5}>
+        <Grid item xs={12} lg={5}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, mb: 3 }}>
             <Typography variant="h6" gutterBottom>
               {t('admin.calendar.blockDatesTitle')}
@@ -123,7 +123,6 @@ export function CalendarPage() {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               {t('admin.calendar.blockDatesHint')}
             </Typography>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
               <Stack spacing={2}>
                 <DatePicker
                   label={t('admin.calendar.from')}
@@ -152,8 +151,13 @@ export function CalendarPage() {
                 >
                   {create.isPending ? t('admin.calendar.blocking') : t('admin.calendar.blockButton')}
                 </Button>
+                {/* Same dates, but as a real booking for a guest (phone / walk-in). */}
+                <NewBookingButton
+                  checkIn={start}
+                  checkOut={end}
+                  buttonProps={{ variant: 'outlined' }}
+                />
               </Stack>
-            </LocalizationProvider>
           </Paper>
 
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3 }}>
@@ -176,7 +180,7 @@ export function CalendarPage() {
                 >
                   <Box>
                     <Typography variant="body2">
-                      {b.startDate.slice(0, 10)} → {b.endDate.slice(0, 10)}
+                      {fmtDate(b.startDate)} → {fmtDate(b.endDate)}
                     </Typography>
                     {b.reason && (
                       <Typography variant="caption" color="text.secondary">

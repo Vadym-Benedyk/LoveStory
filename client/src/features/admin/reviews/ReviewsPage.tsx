@@ -1,3 +1,4 @@
+import { useFormatDate } from '@/i18n/DateLocaleProvider';
 import { useState } from 'react';
 import {
   Alert,
@@ -37,6 +38,7 @@ const statusChip: Record<ReviewStatus, 'warning' | 'success' | 'default'> = {
 
 export function ReviewsPage() {
   const { t } = useLanguage();
+  const fmtDate = useFormatDate();
   // Moderation queue first: that's what the owner comes here for.
   const [filter, setFilter] = useState<Filter>('PENDING');
   const { data, isLoading } = useAdminReviews(filter === 'ALL' ? undefined : filter);
@@ -123,7 +125,7 @@ export function ReviewsPage() {
                 {r.body}
               </Typography>
               <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-                {[r.authorName, r.stayMonth, t('admin.reviews.submitted', { date: r.createdAt.slice(0, 10) })]
+                {[r.authorName, r.stayMonth, t('admin.reviews.submitted', { date: fmtDate(r.createdAt) })]
                   .filter(Boolean)
                   .join(' · ')}
               </Typography>

@@ -36,10 +36,13 @@ export interface Booking {
   checkIn: string;
   checkOut: string;
   status: BookingStatus;
+  source?: 'WEBSITE' | 'MANUAL';
   priceQuoteMinor: number;
   currency: string;
   comments?: string | null;
   internalNotes?: string | null;
+  confirmedAt?: string | null;
+  confirmedBy?: { name: string; email: string } | null;
   createdAt: string;
 }
 

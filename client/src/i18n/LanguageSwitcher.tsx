@@ -25,13 +25,18 @@ export function LanguageSwitcher({ size = 'small', contrast = false }: Props) {
           fontWeight: 600,
           lineHeight: 1.2,
           border: '1px solid',
-          borderColor: contrast ? 'rgba(255,255,255,0.4)' : 'divider',
-          color: contrast ? '#fbf8f1' : 'text.primary',
+          borderColor: contrast ? 'rgba(251,248,241,0.5)' : 'divider',
+          // Inactive language on a dark header: dimmed cream text.
+          color: contrast ? 'rgba(251,248,241,0.75)' : 'text.primary',
+          '&:hover': contrast ? { bgcolor: 'rgba(251,248,241,0.12)', color: '#fbf8f1' } : {},
         },
-        '& .Mui-selected': {
-          bgcolor: contrast ? 'rgba(255,255,255,0.18)' : 'primary.main',
-          color: contrast ? '#fff' : 'primary.contrastText',
-          '&:hover': { bgcolor: contrast ? 'rgba(255,255,255,0.28)' : 'primary.dark' },
+        // Active language: solid fill that clearly stands out from the background —
+        // forest green on light headers, cream with dark text on the dark admin header.
+        '& .MuiToggleButton-root.Mui-selected': {
+          bgcolor: contrast ? 'background.paper' : 'primary.main',
+          color: contrast ? 'text.primary' : 'primary.contrastText',
+          borderColor: contrast ? 'background.paper' : undefined,
+          '&:hover': { bgcolor: contrast ? '#efe8da' : 'primary.dark' },
         },
       }}
     >

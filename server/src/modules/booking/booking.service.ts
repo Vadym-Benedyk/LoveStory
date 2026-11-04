@@ -6,7 +6,7 @@ import { toDateOnly } from '../../lib/dates.js';
 import { adminRequestsUrl, notifyNewRequest } from '../../lib/notify.js';
 import { buildQuote, type QuoteAddonInput } from '../pricing/pricing.engine.js';
 import { getOverlappingPending, isRangeAvailable } from '../availability/availability.service.js';
-import type { CreateBookingInput, QuoteInput } from './booking.schema.js';
+import type { AdminCreateBookingInput, CreateBookingInput, QuoteInput } from './booking.schema.js';
 
 const refCode = customAlphabet('ACDEFGHJKLMNPQRSTUVWXYZ23456789', 8);
 
@@ -124,12 +124,77 @@ export async function createBookingRequest(input: CreateBookingInput) {
   return { booking, quote: q };
 }
 
+// Admin "new booking" for guests who called / wrote directly (source = MANUAL).
+// - Price: rules-based quote unless the owner sets priceMinor (e.g. a discount agreed by phone).
+// - CONFIRMED (default): created inside a transaction with the same overlap check as
+//   confirmBooking, so it can never double-book. PENDING: still refused on taken dates.
+// - No owner notification (the owner made it); min-stay rules are not enforced here.
+export async function createManualBooking(input: AdminCreateBookingInput, actorId: string) {
+  const checkIn = toDateOnly(input.checkIn);
+  const checkOut = toDateOnly(input.checkOut);
+  if (checkIn < toDateOnly(new Date())) throw BadRequest('Check-in cannot be in the past');
+
+  const { rules } = await loadPricingInputs({ addons: [] });
+  const q = buildQuote({ checkIn, checkOut, rules, currency: env.DEFAULT_CURRENCY });
+  const priceQuoteMinor = input.priceMinor ?? q.totalMinor;
+  const confirmed = input.status === 'CONFIRMED';
+
+  const booking = await prisma.$transaction(async (tx) => {
+    const free = await isRangeAvailable(checkIn, checkOut, { tx: tx as never });
+    if (!free) throw Conflict('These dates are already taken');
+
+    const created = await tx.booking.create({
+      data: {
+        reference: refCode(),
+        guestName: input.guestName,
+        guestPhone: input.guestPhone,
+        guestEmail: input.guestEmail,
+        guestsCount: input.guestsCount,
+        checkIn,
+        checkOut,
+        status: input.status,
+        source: 'MANUAL',
+        priceQuoteMinor,
+        currency: q.currency,
+        internalNotes: input.internalNotes,
+        ...(confirmed ? { confirmedAt: new Date(), confirmedById: actorId } : {}),
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: 'BOOKING_CREATED_MANUAL',
+        entity: 'Booking',
+        entityId: created.id,
+        meta: JSON.stringify({
+          status: input.status,
+          quotedMinor: q.totalMinor,
+          priceMinor: priceQuoteMinor,
+        }),
+      },
+    });
+    return created;
+  });
+
+  // Website requests waiting on these dates now clash with a confirmed stay → flag for the owner.
+  const conflictingPendingIds = confirmed
+    ? await flagConflictingPendings(booking.id, checkIn, checkOut)
+    : [];
+  return { booking, quotedMinor: q.totalMinor, conflictingPendingIds };
+}
+
+// Statuses an admin can confirm from: a waiting request, or a declined one the owner changed
+// their mind about (circumstances changed). Expired/cancelled stays are not revived here.
+const CONFIRMABLE_FROM = ['PENDING', 'DECLINED'];
+
 // Manual confirmation — transactional, re-checks availability to prevent double-confirm.
 export async function confirmBooking(id: string, actorId: string) {
   return prisma.$transaction(async (tx) => {
     const booking = await tx.booking.findUnique({ where: { id } });
     if (!booking) throw NotFound('Booking not found');
-    if (booking.status !== 'PENDING') throw Conflict(`Cannot confirm a ${booking.status} booking`);
+    if (!CONFIRMABLE_FROM.includes(booking.status)) {
+      throw Conflict(`Cannot confirm a ${booking.status} booking`);
+    }
 
     const free = await isRangeAvailable(booking.checkIn, booking.checkOut, { tx: tx as never });
     if (!free) throw Conflict('Dates already taken by another confirmed booking');
@@ -140,7 +205,13 @@ export async function confirmBooking(id: string, actorId: string) {
     });
 
     await tx.auditLog.create({
-      data: { actorId, action: 'BOOKING_CONFIRMED', entity: 'Booking', entityId: id },
+      data: {
+        actorId,
+        action: 'BOOKING_CONFIRMED',
+        entity: 'Booking',
+        entityId: id,
+        meta: JSON.stringify({ from: booking.status }),
+      },
     });
     return updated;
   });
@@ -185,12 +256,46 @@ export async function setStatus(
   return updated;
 }
 
-export async function listBookings(status?: string) {
+export type BookingPeriod = 'week' | 'month' | 'year';
+
+// Start of the "last week / month / year" window, counted back from now (rolling window,
+// not calendar week/month): 7 days, 1 month, 1 year.
+export function periodStart(period: BookingPeriod, now = new Date()): Date {
+  const d = new Date(now);
+  if (period === 'week') d.setUTCDate(d.getUTCDate() - 7);
+  else if (period === 'month') d.setUTCMonth(d.getUTCMonth() - 1);
+  else d.setUTCFullYear(d.getUTCFullYear() - 1);
+  return d;
+}
+
+// Optional filters: status, and period = bookings CREATED within the last week/month/year.
+export async function listBookings(status?: string, period?: BookingPeriod) {
   return prisma.booking.findMany({
-    where: status ? { status: status as never } : {},
+    where: {
+      ...(status ? { status: status as never } : {}),
+      ...(period ? { createdAt: { gte: periodStart(period) } } : {}),
+    },
     orderBy: { createdAt: 'desc' },
-    include: { addons: { include: { addon: true } }, appliedPromotion: true },
+    include: {
+      addons: { include: { addon: true } },
+      appliedPromotion: true,
+      confirmedBy: { select: { name: true, email: true } },
+    },
   });
+}
+
+// Manager's private note on a booking (not shown to the guest). '' / null clears it.
+export async function updateInternalNotes(id: string, internalNotes: string | null, actorId: string) {
+  const existing = await prisma.booking.findUnique({ where: { id }, select: { internalNotes: true } });
+  if (!existing) throw NotFound('Booking not found');
+  const value = internalNotes?.trim() || null;
+  const updated = await prisma.booking.update({ where: { id }, data: { internalNotes: value } });
+  if (value !== existing.internalNotes) {
+    await prisma.auditLog.create({
+      data: { actorId, action: 'BOOKING_NOTES_UPDATED', entity: 'Booking', entityId: id },
+    });
+  }
+  return updated;
 }
 
 // Expire stale pending requests (called by cron).

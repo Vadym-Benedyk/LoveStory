@@ -200,9 +200,28 @@ describe('status state machine (product-design §4)', () => {
     expect(await unavailable(day(0), day(60))).toEqual([]);
   });
 
-  it('a declined request can no longer be confirmed', async () => {
+  it('a declined request can be accepted again later (blocks dates, audit notes where from)', async () => {
     const b = await pending(day(10), day(13));
     expect((await setStatus(b.id, 'DECLINED')).status).toBe(200);
+    const res = await confirm(b.id);
+    expect(res.status).toBe(200);
+    expect(res.body.booking.status).toBe('CONFIRMED');
+    expect(await unavailable(day(0), day(60))).toEqual([{ start: day(10), end: day(13), kind: 'BOOKING' }]);
+    const log = await prisma.auditLog.findFirstOrThrow({ where: { entityId: b.id, action: 'BOOKING_CONFIRMED' } });
+    expect(JSON.parse(log.meta)).toEqual({ from: 'DECLINED' });
+  });
+
+  it('a declined request cannot be accepted once its dates are taken', async () => {
+    const declined = await pending(day(10), day(13));
+    await setStatus(declined.id, 'DECLINED');
+    await confirm((await pending(day(11), day(12))).id);
+    expect((await confirm(declined.id)).status).toBe(409);
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: declined.id } })).status).toBe('DECLINED');
+  });
+
+  it.each(['CANCELLED', 'EXPIRED', 'CONFIRMED'])('refuses to confirm a %s booking', async (from) => {
+    const b = await pending(day(10), day(13));
+    await prisma.booking.update({ where: { id: b.id }, data: { status: from } });
     expect((await confirm(b.id)).status).toBe(409);
   });
 
