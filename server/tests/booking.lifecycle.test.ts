@@ -72,6 +72,13 @@ describe('guest request', () => {
     expect(await unavailable(day(0), day(60))).toEqual([]);
   });
 
+  it('accepts more guests than the capacity (form offers up to 6) for the owner to discuss', async () => {
+    const res = await call(srv, 'POST', '/bookings', { body: bookingRequest(day(10), day(12), { guestsCount: 7 }) });
+    expect(res.status).toBe(201);
+    const row = await prisma.booking.findUniqueOrThrow({ where: { reference: res.body.reference } });
+    expect(row.guestsCount).toBe(7);
+  });
+
   it('accepts overlapping requests while they are only pending', async () => {
     const a = await call(srv, 'POST', '/bookings', { body: bookingRequest(day(10), day(13)) });
     const b = await call(srv, 'POST', '/bookings', { body: bookingRequest(day(11), day(14)) });
@@ -83,7 +90,7 @@ describe('guest request', () => {
     ['check-out not after check-in', bookingRequest(day(10), day(10))],
     ['missing consent', bookingRequest(day(10), day(12), { consent: false })],
     ['honeypot filled (bot)', bookingRequest(day(10), day(12), { website: 'http://spam' })],
-    ['more guests than capacity (4)', bookingRequest(day(10), day(12), { guestsCount: 5 })],
+    ['more than 50 guests', bookingRequest(day(10), day(12), { guestsCount: 51 })],
   ])('rejects %s with 400', async (_label, body) => {
     const res = await call(srv, 'POST', '/bookings', { body });
     expect(res.status).toBe(400);

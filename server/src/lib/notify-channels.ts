@@ -8,6 +8,7 @@ export interface NewRequestNotice {
   guestPhone: string;
   guestEmail?: string | null;
   guestsCount: number;
+  capacity?: number | null; // house capacity, to flag over-capacity requests
   checkIn: Date; // date-only (UTC midnight)
   checkOut: Date; // exclusive
   nights: number;
@@ -50,7 +51,9 @@ export function formatNewRequestMessage(n: NewRequestNotice): NotificationMessag
     `Телефон: ${n.guestPhone}`,
     n.guestEmail ? `Email: ${n.guestEmail}` : null,
     `Дати: ${fmtDate(n.checkIn)} → ${fmtDate(n.checkOut)} (${nightsLabel(n.nights)})`,
-    `Гостей: ${n.guestsCount}`,
+    n.capacity && n.guestsCount > n.capacity
+      ? `Гостей: ${n.guestsCount} ⚠️ більше за місткість (${n.capacity}) — уточніть під час дзвінка`
+      : `Гостей: ${n.guestsCount}`,
     `Сума (орієнтовно): ${fmtMoney(n.totalMinor, n.currency)}`,
     n.addons.length
       ? `Додатково: ${n.addons.map((a) => `${a.name} ×${a.quantity}`).join(', ')}`

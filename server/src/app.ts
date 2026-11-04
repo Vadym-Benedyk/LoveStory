@@ -8,8 +8,10 @@ import { logger } from './lib/logger.js';
 import { apiRouter } from './routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 
-export function createApp() {
+export function createApp(opts: { trustProxy?: number } = {}) {
   const app = express();
+  // Real client IP behind N reverse proxies (rate limiting depends on it). 0 → don't trust.
+  app.set('trust proxy', opts.trustProxy ?? env.TRUST_PROXY);
 
   app.use(helmet());
   app.use(

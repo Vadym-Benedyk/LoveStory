@@ -24,6 +24,23 @@ export const useReviews = () =>
       },
   });
 
+export interface ExchangeRates {
+  base: string;
+  source: 'NBU';
+  date: string; // YYYY-MM-DD
+  uahPer: Record<string, number>; // UAH per 1 unit of each currency
+}
+
+// Official NBU rates via our API (cached server-side). Display-only; a failure just means
+// prices are shown in the base currency.
+export const useExchangeRates = () =>
+  useQuery({
+    queryKey: ['exchange-rates'],
+    queryFn: async () => (await api.get<ExchangeRates>('/exchange-rates')).data,
+    staleTime: 60 * 60 * 1000,
+    retry: 1,
+  });
+
 export const useGallery = () =>
   useQuery({
     queryKey: ['gallery'],

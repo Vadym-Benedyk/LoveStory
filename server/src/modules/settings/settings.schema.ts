@@ -60,7 +60,7 @@ const optionalHttpsUrl = z.union([
 // are stripped by zod, so this endpoint can't write arbitrary SiteSettings columns.
 export const updateSettingsSchema = z
   .object({
-    capacity: z.coerce.number().int().min(2).max(50), // booking form has no guest picker yet: requests default to 2 guests
+    capacity: z.coerce.number().int().min(1).max(50),
     phone: z.string().trim().max(40),
     email: optionalEmail,
     address: z.string().trim().max(300),

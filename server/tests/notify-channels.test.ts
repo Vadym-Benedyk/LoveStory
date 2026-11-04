@@ -51,6 +51,13 @@ describe('formatNewRequestMessage', () => {
     expect(text).toContain('Заявки: http://localhost:5173/admin/requests');
   });
 
+  it('flags more guests than the house capacity', () => {
+    expect(formatNewRequestMessage(notice({ guestsCount: 6, capacity: 4 })).text).toContain(
+      'Гостей: 6 ⚠️ більше за місткість (4)',
+    );
+    expect(formatNewRequestMessage(notice({ guestsCount: 4, capacity: 4 })).text).toContain('Гостей: 4\n');
+  });
+
   it('omits empty optional lines and lists add-ons / comments when present', () => {
     const bare = formatNewRequestMessage(notice({ guestEmail: null })).text;
     expect(bare).not.toContain('Email:');

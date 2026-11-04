@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../../lib/async-handler.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
-import { publicWriteLimiter } from '../../middleware/rate-limit.js';
+import { bookingRequestLimiter, quoteLimiter } from '../../middleware/rate-limit.js';
 import { toDateOnly } from '../../lib/dates.js';
 import { getUnavailableRanges } from '../availability/availability.service.js';
 import * as service from './booking.service.js';
@@ -28,7 +28,7 @@ publicBookingRouter.get(
 
 publicBookingRouter.post(
   '/quote',
-  publicWriteLimiter,
+  quoteLimiter,
   validate({ body: quoteSchema }),
   asyncHandler(async (req, res) => {
     res.json(await service.quote(req.body));
@@ -37,7 +37,7 @@ publicBookingRouter.post(
 
 publicBookingRouter.post(
   '/bookings',
-  publicWriteLimiter,
+  bookingRequestLimiter,
   validate({ body: createBookingSchema }),
   asyncHandler(async (req, res) => {
     const { booking, quote } = await service.createBookingRequest(req.body);

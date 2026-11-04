@@ -6,6 +6,7 @@ interface LanguageState {
   lang: Lang;
   setLang: (l: Lang) => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
+  tp: (key: string, n: number, vars?: Record<string, string | number>) => string;
 }
 
 const STORAGE_KEY = 'lovestory_lang';
@@ -36,9 +37,22 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     [lang],
   );
 
+  // Plurals: looks up `${key}.${category}` (Intl.PluralRules: uk → one/few/many/other,
+  // en → one/other) and interpolates {n}. Falls back to `${key}.other`.
+  const tp = useCallback(
+    (key: string, n: number, vars?: Record<string, string | number>) => {
+      const cat = new Intl.PluralRules(lang).select(n);
+      const dict = translations[lang];
+      const str =
+        dict[`${key}.${cat}`] ?? dict[`${key}.other`] ?? translations.en[`${key}.other`] ?? key;
+      return interpolate(str, { n, ...vars });
+    },
+    [lang],
+  );
+
   const value = useMemo<LanguageState>(
-    () => ({ lang, setLang: setLangState, t }),
-    [lang, t],
+    () => ({ lang, setLang: setLangState, t, tp }),
+    [lang, t, tp],
   );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

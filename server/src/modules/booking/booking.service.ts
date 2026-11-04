@@ -52,14 +52,13 @@ export async function createBookingRequest(input: CreateBookingInput) {
   const checkOut = toDateOnly(input.checkOut);
   if (checkIn < toDateOnly(new Date())) throw BadRequest('Check-in cannot be in the past');
 
-  // Capacity is owner-editable in admin Settings.
+  // More guests than the house's capacity (admin Settings) is accepted on purpose — the form
+  // offers up to 6 — and flagged for the owner, who settles it on the confirmation call.
   const settings = await prisma.siteSettings.findUnique({
     where: { id: 'default' },
     select: { capacity: true },
   });
-  if (settings && input.guestsCount > settings.capacity) {
-    throw BadRequest(`The house sleeps up to ${settings.capacity} guests`);
-  }
+  const capacity = settings?.capacity ?? null;
 
   // Re-check availability server-side (client view is only a hint).
   const available = await isRangeAvailable(checkIn, checkOut);
@@ -111,6 +110,7 @@ export async function createBookingRequest(input: CreateBookingInput) {
     guestPhone: booking.guestPhone,
     guestEmail: booking.guestEmail,
     guestsCount: booking.guestsCount,
+    capacity,
     checkIn,
     checkOut,
     nights: q.nights,

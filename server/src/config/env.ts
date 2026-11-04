@@ -5,6 +5,10 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(4000),
   CLIENT_ORIGIN: z.string().default('http://localhost:5173'),
+  // Number of reverse proxies in front of the app (Railway/Render/Caddy/nginx → usually 1).
+  // Needed so rate limits count per visitor, not per proxy IP. Keep 0 when the app is reached
+  // directly: trusting X-Forwarded-For without a proxy lets clients spoof their IP.
+  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
 
   DATABASE_URL: z.string(),
 

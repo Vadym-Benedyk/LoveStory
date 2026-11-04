@@ -1,5 +1,8 @@
 // Ukrainian translations (default). Flat dot-keys; {name} placeholders for interpolation.
 export const uk: Record<string, string> = {
+  // currency / prices
+  'currency.uah': 'грн',
+  'price.rateNote': 'Орієнтовно, за курсом НБУ на {date}: {one} = {rate}.',
   // nav
   'nav.about': 'Про дім',
   'nav.gallery': 'Галерея',
@@ -65,14 +68,25 @@ export const uk: Record<string, string> = {
     'Оберіть дати та надішліть заявку. Ми підтверджуємо кожне бронювання особисто за телефоном — дати закріплюються лише після розмови.',
   'booking.legend.available': 'Вільно',
   'booking.legend.unavailable': 'Зайнято',
-  'booking.selectCheckin': 'Оберіть дату заїзду',
+  'booking.hintSelect': 'Натисніть дату — це одна ніч. Щоб обрати кілька ночей, натисніть першу, а потім останню ніч.',
+  'booking.hintExtend': 'Щоб залишитися довше, натисніть дату останньої ночі.',
+  'booking.hintRestart': 'Щоб змінити дати, натисніть будь-яку дату — вибір почнеться заново.',
   'booking.checkin': 'Заїзд',
   'booking.checkout': 'Виїзд',
-  'booking.nowSelectCheckout': 'тепер оберіть дату виїзду',
-  'booking.nights': 'ночей',
-  'booking.minStay': 'Мінімальний термін для цих дат — {n} ночей.',
+  'booking.nightsCount.one': '{n} ніч',
+  'booking.nightsCount.few': '{n} ночі',
+  'booking.nightsCount.many': '{n} ночей',
+  'booking.nightsCount.other': '{n} ночі',
+  'booking.minStay': 'Мінімальний термін для цих дат — {nights}.',
+  'booking.validation.dates': 'Оберіть дати в календарі: одна дата — одна ніч.',
+  'booking.validation.name': 'Вкажіть ім’я (щонайменше 2 символи).',
+  'booking.validation.phone': 'Вкажіть номер телефону, щоб ми могли вам зателефонувати.',
+  'booking.validation.consent': 'Поставте позначку, щоб ми могли зателефонувати для підтвердження.',
+  'booking.validation.minStay': 'Обрані дати коротші за мінімальний термін проживання.',
   'booking.form.name': 'Ваше ім’я',
   'booking.form.phone': 'Номер телефону',
+  'booking.form.guests': 'Кількість гостей',
+  'booking.form.guestsOverCapacity': 'Зазвичай будинок приймає до {capacity} гостей — ми обговоримо деталі телефоном.',
   'booking.form.email': 'Email (необов’язково)',
   'booking.form.comments': 'Що нам варто знати? (необов’язково)',
   'booking.form.consent':
@@ -81,9 +95,7 @@ export const uk: Record<string, string> = {
   'booking.sending': 'Надсилання…',
   'booking.noPayment': 'Це лише заявка. Оплата зараз не стягується.',
   'booking.success.title': 'Заявку отримано',
-  'booking.success.ref': 'Ваш номер заявки —',
-  'booking.success.note':
-    'Поки що нічого не заброньовано — власник зателефонує, щоб підтвердити ці дати.',
+  'booking.success.note': 'Незабаром ми вам зателефонуємо, щоб підтвердити замовлення.',
   'booking.error': 'Не вдалося надіслати. Спробуйте ще раз.',
 
   // ===== Адмін-панель =====
@@ -133,6 +145,7 @@ export const uk: Record<string, string> = {
   'admin.requests.title': 'Заявки в очікуванні',
   'admin.requests.empty': 'Немає заявок в очікуванні.',
   'admin.requests.datesGuests': '{checkIn} → {checkOut} · гостей: {count}',
+  'admin.guests.overCapacity': 'більше за місткість ({capacity})',
   'admin.requests.quote': 'Сума: {amount}',
   'admin.requests.decline': 'Відхилити',
   'admin.requests.confirmAndBlock': 'Підтвердити та забронювати дати',
@@ -312,8 +325,8 @@ export const uk: Record<string, string> = {
   'admin.settings.social.invalid': 'Посилання мають починатися з https://',
   'admin.settings.house.title': 'Будинок',
   'admin.settings.capacity': 'Максимум гостей',
-  'admin.settings.capacityHelp': 'Заявки на більшу кількість гостей не прийматимуться.',
-  'admin.settings.capacityInvalid': 'Введіть число від 2 до 50.',
+  'admin.settings.capacityHelp': 'У формі бронювання можна обрати від 1 до 6 гостей (або до місткості, якщо вона більша). Заявки понад місткість позначаються в адмінці й у сповіщенні.',
+  'admin.settings.capacityInvalid': 'Введіть число від 1 до 50.',
   'admin.settings.notify.title': 'Сповіщення про нові заявки',
   'admin.settings.notify.hint': 'Куди надсилати лист, коли гість залишає заявку на бронювання.',
   'admin.settings.notificationEmail': 'Email для сповіщень',

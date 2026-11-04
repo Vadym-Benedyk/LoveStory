@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/shared/api/client';
 import { formatMoney, type Booking } from '@/shared/types';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { OverCapacityChip } from '../OverCapacityChip';
 
 export function RequestsPage() {
   const { t } = useLanguage();
@@ -52,10 +53,11 @@ export function RequestsPage() {
               </Stack>
               <Typography variant="body2" color="text.secondary">
                 {t('admin.requests.datesGuests', {
-                  checkIn: b.checkIn,
-                  checkOut: b.checkOut,
+                  checkIn: b.checkIn.slice(0, 10),
+                  checkOut: b.checkOut.slice(0, 10),
                   count: b.guestsCount,
                 })}
+                <OverCapacityChip guests={b.guestsCount} />
               </Typography>
               <Typography variant="body2" sx={{ my: 1 }}>
                 {t('admin.requests.quote', { amount: formatMoney(b.priceQuoteMinor, b.currency) })}

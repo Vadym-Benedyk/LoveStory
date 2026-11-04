@@ -19,6 +19,7 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import { formatMoney, type Booking, type BookingStatus } from '@/shared/types';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useBookings, useBookingActions } from '../api';
+import { OverCapacityChip } from '../OverCapacityChip';
 
 const STATUS_FILTERS: { value: string; key: string }[] = [
   { value: 'ALL', key: 'admin.bookings.filter.all' },
@@ -145,7 +146,10 @@ export function BookingsPage() {
                   <TableCell>
                     {b.checkIn.slice(0, 10)} → {b.checkOut.slice(0, 10)}
                   </TableCell>
-                  <TableCell>{b.guestsCount}</TableCell>
+                  <TableCell>
+                    {b.guestsCount}
+                    <OverCapacityChip guests={b.guestsCount} />
+                  </TableCell>
                   <TableCell>{formatMoney(b.priceQuoteMinor, b.currency)}</TableCell>
                   <TableCell>
                     <Chip size="small" label={b.status} color={statusChip[b.status]} />

@@ -50,7 +50,7 @@ describe('updateSettingsSchema', () => {
     expect(updateSettingsSchema.safeParse({ notificationEmail: 'nope' }).success).toBe(false);
     expect(updateSettingsSchema.safeParse({ notificationEmail: '' }).success).toBe(true);
     expect(updateSettingsSchema.safeParse({ socialLinks: { instagram: 'http://x.com' } }).success).toBe(false);
-    expect(updateSettingsSchema.safeParse({ capacity: 1 }).success).toBe(false);
-    expect(updateSettingsSchema.safeParse({ capacity: 2 }).success).toBe(true);
+    expect(updateSettingsSchema.safeParse({ capacity: 0 }).success).toBe(false);
+    expect(updateSettingsSchema.safeParse({ capacity: 1 }).success).toBe(true);
   });
 });

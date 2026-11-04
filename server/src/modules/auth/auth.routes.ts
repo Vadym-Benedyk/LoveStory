@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../../lib/async-handler.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../../middleware/auth.js';
-import { loginLimiter } from '../../middleware/rate-limit.js';
+import { loginLimiter, passwordChangeLimiter } from '../../middleware/rate-limit.js';
 import { isProd } from '../../config/env.js';
 import * as service from './auth.service.js';
 
@@ -54,7 +54,7 @@ authRouter.get(
 authRouter.post(
   '/password',
   requireAuth,
-  loginLimiter, // same brute-force protection as login: this endpoint checks a password too
+  passwordChangeLimiter, // brute-force protection: this endpoint checks a password too
   validate({
     body: z.object({
       currentPassword: z.string().min(1),

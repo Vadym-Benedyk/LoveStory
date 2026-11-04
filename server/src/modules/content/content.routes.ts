@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../../lib/async-handler.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
-import { publicWriteLimiter } from '../../middleware/rate-limit.js';
+import { reviewSubmitLimiter } from '../../middleware/rate-limit.js';
 import { prisma } from '../../lib/prisma.js';
 import { toPublicSettings } from '../settings/settings.routes.js';
 
@@ -95,7 +95,7 @@ publicContentRouter.get(
 
 publicContentRouter.post(
   '/reviews',
-  publicWriteLimiter,
+  reviewSubmitLimiter,
   validate({
     body: z.object({
       authorName: z.string().min(2).max(120),

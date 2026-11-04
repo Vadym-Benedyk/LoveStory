@@ -7,7 +7,8 @@ export const createBookingSchema = z
     guestName: z.string().min(2).max(120),
     guestPhone: z.string().min(5).max(40),
     guestEmail: z.string().email().optional(),
-    guestsCount: z.coerce.number().int().min(1).max(20).default(2),
+    // The form offers 1–6 (or up to capacity); above the capacity is flagged, not rejected.
+    guestsCount: z.coerce.number().int().min(1).max(50).default(2),
     checkIn: dateStr,
     checkOut: dateStr,
     comments: z.string().max(2000).optional(),

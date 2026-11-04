@@ -132,7 +132,7 @@ function SiteSettingsForm() {
           <TextField
             label={t('admin.settings.capacity')}
             type="number"
-            inputProps={{ min: 2, max: 50 }}
+            inputProps={{ min: 1, max: 50 }}
             {...field('capacity')}
             fullWidth={false}
             sx={{ maxWidth: 220 }}
