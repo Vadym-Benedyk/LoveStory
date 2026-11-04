@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { BadRequest, Conflict, NotFound } from '../../lib/errors.js';
 import { toDateOnly } from '../../lib/dates.js';
+import { adminRequestsUrl, notifyNewRequest } from '../../lib/notify.js';
 import { buildQuote, type QuoteAddonInput } from '../pricing/pricing.engine.js';
 import { getOverlappingPending, isRangeAvailable } from '../availability/availability.service.js';
 import type { CreateBookingInput, QuoteInput } from './booking.schema.js';
@@ -93,6 +94,24 @@ export async function createBookingRequest(input: CreateBookingInput) {
     },
   });
 
+  // Fire-and-forget: the guest gets their reference immediately; channel retries/failures
+  // are handled and logged inside notifyNewRequest (it never rejects).
+  void notifyNewRequest({
+    reference: booking.reference,
+    guestName: booking.guestName,
+    guestPhone: booking.guestPhone,
+    guestEmail: booking.guestEmail,
+    guestsCount: booking.guestsCount,
+    checkIn,
+    checkOut,
+    nights: q.nights,
+    totalMinor: q.totalMinor,
+    currency: q.currency,
+    addons: addonInputs.map((a) => ({ name: a.addon.name, quantity: a.quantity })),
+    comments: booking.comments,
+    adminUrl: adminRequestsUrl(),
+  });
+
   return { booking, quote: q };
 }
 
@@ -116,8 +135,9 @@ export async function confirmBooking(id: string, actorId: string) {
     });
     return updated;
   });
-  // Note: the DB also enforces a btree_gist exclusion constraint on CONFIRMED ranges
-  // as a last line of defense (see migration). Overlapping pendings are flagged below.
+  // SQLite has no exclusion constraints: this transaction is the only overlap guard for
+  // CONFIRMED ranges (the old Postgres btree_gist constraint is gone). Overlapping pendings
+  // are flagged below.
 }
 
 export async function flagConflictingPendings(bookingId: string, checkIn: Date, checkOut: Date) {

@@ -27,6 +27,7 @@ const schema = z.object({
   S3_PUBLIC_URL: z.string().optional(),
 
   NOTIFY_EMAIL: z.string().optional(),
+  NOTIFY_FROM: z.string().optional(),
   SMTP_URL: z.string().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_CHAT_ID: z.string().optional(),
