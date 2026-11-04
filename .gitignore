@@ -18,6 +18,8 @@ server/prisma/*.db
 server/prisma/*.db-journal
 server/prisma/*.db-wal
 server/prisma/*.db-shm
+# stray DB created outside prisma/ (see server/src/lib/sqlite-path.ts)
+server/*.db
 
 # logs
 *.log
@@ -40,3 +42,5 @@ logs/
 coverage/
 .cache/
 tmp/
+# Vite/Vitest config bundling leftovers
+*.timestamp-*.mjs
