@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/shared/api/client';
-import type { Booking } from '@/shared/types';
+import type { Booking, Review, ReviewStatus } from '@/shared/types';
 
 export interface CalendarBlock {
   id: string;
@@ -286,4 +286,40 @@ export function usePricingActions() {
   });
 
   return { createRule, updateRule, removeRule, createAddon, updateAddon, removeAddon };
+}
+
+// ---- Reviews (moderation) ----
+export interface AdminReviews {
+  reviews: Review[];
+  counts: Record<ReviewStatus, number>;
+}
+
+export const useAdminReviews = (status?: ReviewStatus) =>
+  useQuery({
+    queryKey: ['admin', 'reviews', status ?? 'ALL'],
+    queryFn: async () =>
+      (await api.get<AdminReviews>('/admin/reviews', { params: status ? { status } : {} })).data,
+  });
+
+export function useReviewActions() {
+  const qc = useQueryClient();
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['admin', 'reviews'] });
+    qc.invalidateQueries({ queryKey: ['reviews'] }); // public list (if cached in this tab)
+  };
+
+  const update = useMutation({
+    mutationFn: async (vars: { id: string; status?: ReviewStatus; ownerReply?: string | null }) => {
+      const { id, ...patch } = vars;
+      return (await api.patch<Review>(`/admin/reviews/${id}`, patch)).data;
+    },
+    onSuccess: invalidate,
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/admin/reviews/${id}`)).data,
+    onSuccess: invalidate,
+  });
+
+  return { update, remove };
 }

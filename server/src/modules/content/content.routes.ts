@@ -62,6 +62,17 @@ publicContentRouter.get(
     const reviews = await prisma.review.findMany({
       where: { status: 'APPROVED' },
       orderBy: { createdAt: 'desc' },
+      // Public shape only — no moderation fields (status, approvedById, source).
+      select: {
+        id: true,
+        authorName: true,
+        rating: true,
+        title: true,
+        body: true,
+        stayMonth: true,
+        ownerReply: true,
+        createdAt: true,
+      },
     });
     const avg = reviews.length
       ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length

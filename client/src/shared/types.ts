@@ -57,6 +57,27 @@ export interface GalleryMedia {
   sortOrder: number;
 }
 
+export type ReviewStatus = 'PENDING' | 'APPROVED' | 'HIDDEN';
+
+// Public shape (GET /reviews): approved only, no moderation fields.
+export interface PublicReview {
+  id: string;
+  authorName: string;
+  rating: number;
+  title?: string | null;
+  body: string;
+  stayMonth?: string | null;
+  ownerReply?: string | null;
+  createdAt: string;
+}
+
+// Admin shape (GET /admin/reviews).
+export interface Review extends PublicReview {
+  status: ReviewStatus;
+  source: string;
+  approvedAt?: string | null;
+}
+
 export interface SiteContent {
   copy: Record<string, string>;
   settings: {

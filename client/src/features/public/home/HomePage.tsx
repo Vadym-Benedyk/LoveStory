@@ -148,11 +148,19 @@ export function HomePage() {
                 <Grid key={r.id} item xs={12} md={4}>
                   <Paper className={styles.reviewCard} elevation={0}>
                     <Rating value={r.rating} readOnly size="small" />
-                    <Typography variant="subtitle1">{r.title}</Typography>
+                    {r.title && <Typography variant="subtitle1">{r.title}</Typography>}
                     <Typography variant="body2">{r.body}</Typography>
                     <Typography variant="caption">
-                      {r.authorName} · {r.stayMonth}
+                      {[r.authorName, r.stayMonth].filter(Boolean).join(' · ')}
                     </Typography>
+                    {r.ownerReply && (
+                      <div className={styles.ownerReply}>
+                        <Typography variant="caption" fontWeight={600} display="block">
+                          {t('reviews.ownerReply')}
+                        </Typography>
+                        <Typography variant="body2">{r.ownerReply}</Typography>
+                      </div>
+                    )}
                   </Paper>
                 </Grid>
               ))}

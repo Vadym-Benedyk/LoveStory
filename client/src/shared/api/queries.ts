@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './client';
-import type { GalleryMedia, SiteContent, UnavailableRange } from '@/shared/types';
+import type { GalleryMedia, PublicReview, SiteContent, UnavailableRange } from '@/shared/types';
 
 export const useSiteContent = () =>
   useQuery({
@@ -19,7 +19,7 @@ export const useReviews = () =>
     queryKey: ['reviews'],
     queryFn: async () =>
       (await api.get('/reviews')).data as {
-        reviews: any[];
+        reviews: PublicReview[];
         summary: { count: number; average: number | null };
       },
   });
