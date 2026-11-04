@@ -19,15 +19,21 @@ import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { PickersDay, type PickersDayProps } from '@mui/x-date-pickers/PickersDay';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useMutation } from '@tanstack/react-query';
+import { Link as RouterLink } from 'react-router-dom';
 import { api } from '@/shared/api/client';
 import { useAvailability, useSiteContent } from '@/shared/api/queries';
 import type { Quote } from '@/shared/types';
 import { usePrice } from '@/shared/usePrice';
+import { PhoneMaskInput, isCompleteUaPhone } from '@/shared/ui/PhoneMaskInput';
 import { useLanguage } from '@/i18n/LanguageContext';
 import styles from './BookingPage.module.scss';
 
 const fmt = (d: Dayjs) => d.format('YYYY-MM-DD');
 const GUEST_OPTIONS = 6;
+// Same rules as the server (booking.schema.ts) so the guest learns about problems before sending.
+const NAME_RE = /\p{L}/u; // at least one letter
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const MAX_COMMENT = 2000;
 
 // Calendar day that also paints the selected stay as a range (check-in → check-out).
 type RangeDayProps = PickersDayProps<Dayjs> & { rangeStart?: Dayjs | null; rangeEnd?: Dayjs | null };
@@ -121,12 +127,12 @@ export function BookingPage() {
       (
         await api.post('/bookings', {
           guestName: form.guestName.trim(),
-          guestPhone: form.guestPhone.trim(),
+          guestPhone: `+${form.guestPhone}`, // unmasked digits from the mask: 380XXXXXXXXX
           guestsCount,
           guestEmail: form.guestEmail.trim() || undefined,
           checkIn: fmt(checkIn!),
           checkOut: fmt(checkOut!),
-          comments: form.comments || undefined,
+          comments: form.comments.trim() || undefined,
           addons: [],
           consent,
           website: form.website,
@@ -155,8 +161,9 @@ export function BookingPage() {
 
   const errors = {
     dates: !checkIn || !checkOut,
-    name: form.guestName.trim().length < 2,
-    phone: form.guestPhone.trim().length < 5,
+    name: form.guestName.trim().length < 2 || !NAME_RE.test(form.guestName),
+    phone: !isCompleteUaPhone(form.guestPhone),
+    email: form.guestEmail.trim() !== '' && !EMAIL_RE.test(form.guestEmail.trim()),
     consent: !consent,
     minStay: quoteMut.data ? !quoteMut.data.meetsMinNights : false,
   };
@@ -184,6 +191,9 @@ export function BookingPage() {
           <Alert severity="info" sx={{ mt: 2 }}>
             {t('booking.success.note')}
           </Alert>
+          <Button component={RouterLink} to="/" variant="contained" size="large" sx={{ mt: 3 }}>
+            {t('booking.success.backHome')}
+          </Button>
         </Paper>
       </Container>
     );
@@ -207,6 +217,26 @@ export function BookingPage() {
                 // Selection is drawn by RangeDay; keeping the picker's own value empty makes
                 // every click (even on an already highlighted day) reach handleDay.
                 value={null}
+                // MUI's calendar is a fixed 320×336px. Phones: let it shrink (day side-margins
+                // dropped) so it never forces horizontal scroll. Tablet/desktop: bigger day cells
+                // (52 / 56px) so the calendar fills its card. Row = cell + 4px (MUI week margin).
+                sx={{
+                  width: '100%',
+                  maxWidth: { xs: 320, sm: 400, md: 440 },
+                  height: 'auto',
+                  maxHeight: 'none',
+                  '& .MuiPickersDay-root, & .MuiDayCalendar-weekDayLabel': {
+                    mx: { xs: 0, sm: '2px' },
+                    width: { xs: 36, sm: 52, md: 56 },
+                  },
+                  '& .MuiPickersDay-root': {
+                    height: { xs: 36, sm: 52, md: 56 },
+                    fontSize: { xs: '0.75rem', sm: '0.95rem', md: '1rem' },
+                  },
+                  '& .MuiDayCalendar-weekDayLabel': { fontSize: { sm: '0.85rem' } },
+                  '& .MuiDayCalendar-slideTransition': { minHeight: { xs: 240, sm: 336, md: 360 } },
+                  '& .MuiPickersCalendarHeader-label': { fontSize: { sm: '1.05rem', md: '1.15rem' } },
+                }}
                 slots={{ day: RangeDay }}
                 slotProps={{ day: { rangeStart: firstNight, rangeEnd: lastNight } as Partial<RangeDayProps> }}
               />
@@ -237,13 +267,8 @@ export function BookingPage() {
               <Box className={styles.quote}>
                 <Typography variant="h6">{tp('booking.nightsCount', quoteMut.data.nights)}</Typography>
                 <Typography variant="h4">
-                  {price.format(quoteMut.data.totalMinor, quoteMut.data.currency)}
+                  {price.format(quoteMut.data.totalMinor)}
                 </Typography>
-                {price.rateNote(quoteMut.data.currency) && (
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    {price.rateNote(quoteMut.data.currency)}
-                  </Typography>
-                )}
                 {!quoteMut.data.meetsMinNights && (
                   <Alert severity="warning" sx={{ mt: 1 }}>
                     {t('booking.minStay', {
@@ -260,6 +285,7 @@ export function BookingPage() {
                 label={t('booking.form.name')}
                 required
                 autoComplete="name"
+                inputProps={{ maxLength: 120 }}
                 value={form.guestName}
                 onChange={(e) => setForm({ ...form, guestName: e.target.value })}
                 error={show('name')}
@@ -272,13 +298,17 @@ export function BookingPage() {
                 value={form.guestPhone}
                 onChange={(e) => setForm({ ...form, guestPhone: e.target.value })}
                 error={show('phone')}
+                InputProps={{ inputComponent: PhoneMaskInput as never }}
+                InputLabelProps={{ shrink: true }} // the mask placeholder is always visible
               />
               <TextField
                 label={t('booking.form.email')}
                 type="email"
                 autoComplete="email"
+                inputProps={{ maxLength: 200 }}
                 value={form.guestEmail}
                 onChange={(e) => setForm({ ...form, guestEmail: e.target.value })}
+                error={show('email')}
               />
               <TextField
                 select
@@ -298,6 +328,7 @@ export function BookingPage() {
                 label={t('booking.form.comments')}
                 multiline
                 minRows={2}
+                inputProps={{ maxLength: MAX_COMMENT }}
                 value={form.comments}
                 onChange={(e) => setForm({ ...form, comments: e.target.value })}
               />
@@ -324,6 +355,7 @@ export function BookingPage() {
                     errors.minStay && t('booking.validation.minStay'),
                     errors.name && t('booking.validation.name'),
                     errors.phone && t('booking.validation.phone'),
+                    errors.email && t('booking.validation.email'),
                     errors.consent && t('booking.validation.consent'),
                   ]
                     .filter(Boolean)

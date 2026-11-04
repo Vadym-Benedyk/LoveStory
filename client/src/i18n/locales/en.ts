@@ -2,7 +2,6 @@
 export const en: Record<string, string> = {
   // currency / prices
   'currency.uah': 'UAH',
-  'price.rateNote': 'Approximate, at the NBU rate on {date}: {one} = {rate}.',
   // nav
   'nav.about': 'About',
   'nav.gallery': 'Gallery',
@@ -75,8 +74,9 @@ export const en: Record<string, string> = {
   'booking.nightsCount.other': '{n} nights',
   'booking.minStay': 'Minimum stay for these dates is {nights}.',
   'booking.validation.dates': 'Choose your dates in the calendar: one date = one night.',
-  'booking.validation.name': 'Enter your name (at least 2 characters).',
-  'booking.validation.phone': 'Enter a phone number so we can call you.',
+  'booking.validation.name': 'Enter your name (at least 2 characters, with letters).',
+  'booking.validation.phone': 'Enter a full phone number: +380 (XX) XXX-XX-XX.',
+  'booking.validation.email': 'Check the email — the address looks incorrect.',
   'booking.validation.consent': 'Please tick the box so we can call you to confirm.',
   'booking.validation.minStay': 'These dates are shorter than the minimum stay.',
   'booking.form.name': 'Your name',
@@ -91,6 +91,7 @@ export const en: Record<string, string> = {
   'booking.noPayment': 'This sends a request only. No payment is taken now.',
   'booking.success.title': 'Request received',
   'booking.success.note': 'We will call you shortly to confirm your booking.',
+  'booking.success.backHome': 'Back to home',
   'booking.error': 'Could not submit. Please try again.',
 
   // ===== Admin panel =====

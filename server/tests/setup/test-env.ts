@@ -12,7 +12,7 @@ export const TEST_ENV: Record<string, string> = {
   JWT_REFRESH_SECRET: 'test-refresh-secret',
   CLIENT_ORIGIN: 'http://localhost:5173',
   PENDING_EXPIRY_DAYS: '7',
-  DEFAULT_CURRENCY: 'USD',
+  DEFAULT_CURRENCY: 'UAH',
   SMTP_URL: '',
   TELEGRAM_BOT_TOKEN: '',
   TELEGRAM_CHAT_ID: '',

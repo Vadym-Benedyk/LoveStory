@@ -79,6 +79,16 @@ describe('guest request', () => {
     expect(row.guestsCount).toBe(7);
   });
 
+  it('stores the phone normalized and treats an empty email as not given', async () => {
+    const res = await call(srv, 'POST', '/bookings', {
+      body: bookingRequest(day(10), day(12), { guestPhone: '+380 (50) 111-22-33', guestEmail: '' }),
+    });
+    expect(res.status).toBe(201);
+    const row = await prisma.booking.findUniqueOrThrow({ where: { reference: res.body.reference } });
+    expect(row.guestPhone).toBe('+380501112233');
+    expect(row.guestEmail).toBeNull();
+  });
+
   it('accepts overlapping requests while they are only pending', async () => {
     const a = await call(srv, 'POST', '/bookings', { body: bookingRequest(day(10), day(13)) });
     const b = await call(srv, 'POST', '/bookings', { body: bookingRequest(day(11), day(14)) });
@@ -91,6 +101,10 @@ describe('guest request', () => {
     ['missing consent', bookingRequest(day(10), day(12), { consent: false })],
     ['honeypot filled (bot)', bookingRequest(day(10), day(12), { website: 'http://spam' })],
     ['more than 50 guests', bookingRequest(day(10), day(12), { guestsCount: 51 })],
+    ['a phone that is not a number', bookingRequest(day(10), day(12), { guestPhone: 'Cepesh' })],
+    ['an incomplete Ukrainian phone', bookingRequest(day(10), day(12), { guestPhone: '+380 (50) 111-22' })],
+    ['a name without letters', bookingRequest(day(10), day(12), { guestName: '12345' })],
+    ['an invalid email', bookingRequest(day(10), day(12), { guestEmail: 'not-an-email' })],
   ])('rejects %s with 400', async (_label, body) => {
     const res = await call(srv, 'POST', '/bookings', { body });
     expect(res.status).toBe(400);

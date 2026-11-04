@@ -1,17 +1,38 @@
 import { z } from 'zod';
+import { normalizePhone } from '../../lib/phone.js';
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
 
 export const createBookingSchema = z
   .object({
-    guestName: z.string().min(2).max(120),
-    guestPhone: z.string().min(5).max(40),
-    guestEmail: z.string().email().optional(),
+    guestName: z
+      .string()
+      .trim()
+      .min(2)
+      .max(120)
+      .regex(/\p{L}/u, 'Name must contain letters'),
+    // Stored normalized ("+380501112233"); see lib/phone.ts.
+    guestPhone: z
+      .string()
+      .max(40)
+      .transform((v, ctx) => {
+        const phone = normalizePhone(v);
+        if (!phone) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid phone number' });
+          return z.NEVER;
+        }
+        return phone;
+      }),
+    // Optional: '' (an untouched field) is treated as "not given".
+    guestEmail: z.preprocess(
+      (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+      z.string().trim().email().max(200).optional(),
+    ),
     // The form offers 1–6 (or up to capacity); above the capacity is flagged, not rejected.
     guestsCount: z.coerce.number().int().min(1).max(50).default(2),
     checkIn: dateStr,
     checkOut: dateStr,
-    comments: z.string().max(2000).optional(),
+    comments: z.string().trim().max(2000).optional(),
     promotionSlug: z.string().optional(),
     addons: z
       .array(z.object({ addonId: z.string(), quantity: z.coerce.number().int().min(1).default(1) }))

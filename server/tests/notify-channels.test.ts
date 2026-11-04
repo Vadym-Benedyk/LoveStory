@@ -47,7 +47,7 @@ describe('formatNewRequestMessage', () => {
     expect(text).toContain('Телефон: +380501234567');
     expect(text).toContain('Email: olena@example.com');
     expect(text).toContain('Дати: 12.11.2026 → 14.11.2026 (2 ночі)');
-    expect(text).toContain(`Сума (орієнтовно): ${fmtMoney(400000, 'UAH')}`);
+    expect(text).toMatch(/Сума \(орієнтовно\): 4\s000 грн/); // Intl uses a non-breaking space
     expect(text).toContain('Заявки: http://localhost:5173/admin/requests');
   });
 

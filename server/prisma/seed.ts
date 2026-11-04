@@ -53,11 +53,11 @@ async function main() {
   if (!base) {
     await prisma.priceRule.createMany({
       data: [
-        { name: 'Standard nightly', kind: 'BASE', nightlyRateMinor: 12000, currency: CURRENCY, priority: 0 },
+        { name: 'Standard nightly', kind: 'BASE', nightlyRateMinor: 350000, currency: CURRENCY, priority: 0 },
         {
           name: 'Weekend',
           kind: 'WEEKEND',
-          nightlyRateMinor: 15000,
+          nightlyRateMinor: 450000,
           currency: CURRENCY,
           daysOfWeek: '5,6',
           priority: 10,
@@ -71,9 +71,9 @@ async function main() {
   if (addonCount === 0) {
     await prisma.addon.createMany({
       data: [
-        { name: 'Firewood bundle', priceMinor: 1500, unit: 'PER_STAY', sortOrder: 1, currency: CURRENCY },
-        { name: 'Heated tub session', priceMinor: 2500, unit: 'PER_NIGHT', sortOrder: 2, currency: CURRENCY },
-        { name: 'Welcome basket', priceMinor: 3000, unit: 'PER_STAY', sortOrder: 3, currency: CURRENCY },
+        { name: 'Firewood bundle', priceMinor: 30000, unit: 'PER_STAY', sortOrder: 1, currency: CURRENCY },
+        { name: 'Heated tub session', priceMinor: 50000, unit: 'PER_NIGHT', sortOrder: 2, currency: CURRENCY },
+        { name: 'Welcome basket', priceMinor: 60000, unit: 'PER_STAY', sortOrder: 3, currency: CURRENCY },
       ],
     });
   }

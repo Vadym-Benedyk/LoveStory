@@ -2,7 +2,6 @@
 export const uk: Record<string, string> = {
   // currency / prices
   'currency.uah': 'грн',
-  'price.rateNote': 'Орієнтовно, за курсом НБУ на {date}: {one} = {rate}.',
   // nav
   'nav.about': 'Про дім',
   'nav.gallery': 'Галерея',
@@ -79,8 +78,9 @@ export const uk: Record<string, string> = {
   'booking.nightsCount.other': '{n} ночі',
   'booking.minStay': 'Мінімальний термін для цих дат — {nights}.',
   'booking.validation.dates': 'Оберіть дати в календарі: одна дата — одна ніч.',
-  'booking.validation.name': 'Вкажіть ім’я (щонайменше 2 символи).',
-  'booking.validation.phone': 'Вкажіть номер телефону, щоб ми могли вам зателефонувати.',
+  'booking.validation.name': 'Вкажіть ім’я (щонайменше 2 символи, з літерами).',
+  'booking.validation.phone': 'Вкажіть повний номер телефону: +380 (XX) XXX-XX-XX.',
+  'booking.validation.email': 'Перевірте email — схоже, в адресі помилка.',
   'booking.validation.consent': 'Поставте позначку, щоб ми могли зателефонувати для підтвердження.',
   'booking.validation.minStay': 'Обрані дати коротші за мінімальний термін проживання.',
   'booking.form.name': 'Ваше ім’я',
@@ -96,6 +96,7 @@ export const uk: Record<string, string> = {
   'booking.noPayment': 'Це лише заявка. Оплата зараз не стягується.',
   'booking.success.title': 'Заявку отримано',
   'booking.success.note': 'Незабаром ми вам зателефонуємо, щоб підтвердити замовлення.',
+  'booking.success.backHome': 'Повернутися на головну',
   'booking.error': 'Не вдалося надіслати. Спробуйте ще раз.',
 
   // ===== Адмін-панель =====

@@ -7,7 +7,7 @@ const rule = (over: Partial<PriceRule>): PriceRule => ({
   name: 'r',
   kind: 'BASE',
   nightlyRateMinor: 10000,
-  currency: 'USD',
+  currency: 'UAH',
   appliesFrom: null,
   appliesTo: null,
   daysOfWeek: '',
@@ -31,7 +31,7 @@ describe('pricing engine', () => {
       checkIn: new Date('2025-06-02'),
       checkOut: new Date('2025-06-04'),
       rules,
-      currency: 'USD',
+      currency: 'UAH',
     });
     expect(q.nights).toBe(2);
     expect(q.accommodationMinor).toBe(20000);
@@ -43,7 +43,7 @@ describe('pricing engine', () => {
       checkIn: new Date('2025-06-06'),
       checkOut: new Date('2025-06-08'),
       rules,
-      currency: 'USD',
+      currency: 'UAH',
     });
     expect(q.accommodationMinor).toBe(30000);
   });
@@ -53,7 +53,7 @@ describe('pricing engine', () => {
       checkIn: new Date('2025-06-02'),
       checkOut: new Date('2025-06-04'),
       rules,
-      currency: 'USD',
+      currency: 'UAH',
       promotion: {
         id: 'p',
         title: '10 off',

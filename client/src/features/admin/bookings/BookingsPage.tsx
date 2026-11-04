@@ -16,7 +16,8 @@ import {
   Typography,
 } from '@mui/material';
 import PhoneIcon from '@mui/icons-material/Phone';
-import { formatMoney, type Booking, type BookingStatus } from '@/shared/types';
+import type { Booking, BookingStatus } from '@/shared/types';
+import { usePrice } from '@/shared/usePrice';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useBookings, useBookingActions } from '../api';
 import { OverCapacityChip } from '../OverCapacityChip';
@@ -40,6 +41,7 @@ const statusChip: Record<BookingStatus, 'default' | 'success' | 'warning' | 'err
 
 export function BookingsPage() {
   const { t } = useLanguage();
+  const price = usePrice();
   const [filter, setFilter] = useState('ALL');
   const { data, isLoading } = useBookings(filter === 'ALL' ? undefined : filter);
   const { confirm, setStatus } = useBookingActions();
@@ -150,7 +152,7 @@ export function BookingsPage() {
                     {b.guestsCount}
                     <OverCapacityChip guests={b.guestsCount} />
                   </TableCell>
-                  <TableCell>{formatMoney(b.priceQuoteMinor, b.currency)}</TableCell>
+                  <TableCell>{price.format(b.priceQuoteMinor)}</TableCell>
                   <TableCell>
                     <Chip size="small" label={b.status} color={statusChip[b.status]} />
                   </TableCell>

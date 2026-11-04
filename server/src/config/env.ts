@@ -20,7 +20,8 @@ const schema = z.object({
   OWNER_PASSWORD: z.string().min(6).default('ChangeMe123!'),
 
   PENDING_EXPIRY_DAYS: z.coerce.number().default(7),
-  DEFAULT_CURRENCY: z.string().default('USD'),
+  // All prices are in hryvnias (minor units = kopiyky). Kept configurable, but the site shows UAH.
+  DEFAULT_CURRENCY: z.string().default('UAH'),
   TIMEZONE: z.string().default('UTC'),
 
   S3_ENDPOINT: z.string().optional(),

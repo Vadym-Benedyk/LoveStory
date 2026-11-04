@@ -10,12 +10,14 @@ import {
 import PhoneIcon from '@mui/icons-material/Phone';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/shared/api/client';
-import { formatMoney, type Booking } from '@/shared/types';
+import type { Booking } from '@/shared/types';
+import { usePrice } from '@/shared/usePrice';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { OverCapacityChip } from '../OverCapacityChip';
 
 export function RequestsPage() {
   const { t } = useLanguage();
+  const price = usePrice();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'bookings', 'PENDING'],
@@ -60,7 +62,7 @@ export function RequestsPage() {
                 <OverCapacityChip guests={b.guestsCount} />
               </Typography>
               <Typography variant="body2" sx={{ my: 1 }}>
-                {t('admin.requests.quote', { amount: formatMoney(b.priceQuoteMinor, b.currency) })}
+                {t('admin.requests.quote', { amount: price.format(b.priceQuoteMinor) })}
               </Typography>
               {b.comments && (
                 <Box sx={{ bgcolor: 'background.default', p: 1.5, borderRadius: 2, mb: 1 }}>

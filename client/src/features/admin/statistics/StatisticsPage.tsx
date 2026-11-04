@@ -1,7 +1,8 @@
 import { Grid, Paper, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/shared/api/client';
-import { formatMoney, type Booking } from '@/shared/types';
+import type { Booking } from '@/shared/types';
+import { usePrice } from '@/shared/usePrice';
 import { useLanguage } from '@/i18n/LanguageContext';
 
 const nights = (a: string, b: string) =>
@@ -9,6 +10,7 @@ const nights = (a: string, b: string) =>
 
 export function StatisticsPage() {
   const { t } = useLanguage();
+  const price = usePrice();
   const { data: bookings = [], isLoading } = useQuery({
     queryKey: ['admin', 'bookings'],
     queryFn: async () => (await api.get<Booking[]>('/admin/bookings')).data,
@@ -24,10 +26,9 @@ export function StatisticsPage() {
   const conversion = decided.length
     ? Math.round((confirmed.length / decided.length) * 100)
     : 0;
-  const currency = bookings[0]?.currency ?? 'USD';
 
   const stats = [
-    { label: t('admin.statistics.confirmedRevenue'), value: formatMoney(revenueMinor, currency) },
+    { label: t('admin.statistics.confirmedRevenue'), value: price.format(revenueMinor) },
     { label: t('admin.statistics.confirmedBookings'), value: confirmed.length },
     { label: t('admin.statistics.pendingRequests'), value: pending.length },
     { label: t('admin.statistics.nightsBooked'), value: nightsBooked },

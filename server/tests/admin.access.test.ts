@@ -88,7 +88,7 @@ describe('settings', () => {
     expect(row).toMatchObject({
       phone: '+380501112233',
       mapEmbed: 'https://www.google.com/maps/embed?pb=abc&x=1',
-      currency: 'USD',
+      currency: 'UAH',
       notificationChannels: '{}',
     });
   });

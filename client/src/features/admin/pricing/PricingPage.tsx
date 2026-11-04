@@ -29,7 +29,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
-import { formatMoney } from '@/shared/types';
+import { usePrice } from '@/shared/usePrice';
 import { useLanguage } from '@/i18n/LanguageContext';
 import {
   usePricing,
@@ -91,7 +91,8 @@ export function PricingPage() {
   const { createRule, updateRule, removeRule, createAddon, updateAddon, removeAddon } =
     usePricingActions();
 
-  const currency = data?.rules[0]?.currency ?? data?.addons[0]?.currency ?? 'USD';
+  const price = usePrice();
+  const currency = price.currencyLabel;
 
   const [ruleDialogId, setRuleDialogId] = useState<string | null | undefined>(undefined);
   const [ruleForm, setRuleForm] = useState<RuleForm>(emptyRuleForm);
@@ -228,7 +229,7 @@ export function PricingPage() {
                       <TableRow key={r.id} hover>
                         <TableCell>{r.name}</TableCell>
                         <TableCell>{t(`admin.pricing.kind.${r.kind.toLowerCase()}`)}</TableCell>
-                        <TableCell>{formatMoney(r.nightlyRateMinor, r.currency)}</TableCell>
+                        <TableCell>{price.format(r.nightlyRateMinor)}</TableCell>
                         <TableCell>{ruleDetails(r)}</TableCell>
                         <TableCell>{r.priority}</TableCell>
                         <TableCell>
@@ -289,7 +290,7 @@ export function PricingPage() {
                     {data?.addons.map((a) => (
                       <TableRow key={a.id} hover>
                         <TableCell>{a.name}</TableCell>
-                        <TableCell>{formatMoney(a.priceMinor, a.currency)}</TableCell>
+                        <TableCell>{price.format(a.priceMinor)}</TableCell>
                         <TableCell>{t(`admin.pricing.unit.${toCamel(a.unit)}`)}</TableCell>
                         <TableCell>
                           <Switch

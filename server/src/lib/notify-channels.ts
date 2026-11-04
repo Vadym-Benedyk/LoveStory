@@ -31,8 +31,11 @@ export interface NotificationMessage {
 const fmtDate = (d: Date): string =>
   `${String(d.getUTCDate()).padStart(2, '0')}.${String(d.getUTCMonth() + 1).padStart(2, '0')}.${d.getUTCFullYear()}`;
 
+// Prices are in hryvnias: "4 000 грн" (Intl would print "₴"). Other currencies keep Intl's format.
 export const fmtMoney = (minor: number, currency: string): string =>
-  new Intl.NumberFormat('uk-UA', { style: 'currency', currency }).format(minor / 100);
+  currency === 'UAH'
+    ? `${new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(Math.round(minor / 100))} грн`
+    : new Intl.NumberFormat('uk-UA', { style: 'currency', currency }).format(minor / 100);
 
 // Ukrainian plural for "night": 1 ніч, 2–4 ночі, 5+ ночей (11–14 → ночей).
 export function nightsLabel(n: number): string {

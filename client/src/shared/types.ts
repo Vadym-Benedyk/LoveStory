@@ -108,5 +108,4 @@ export interface AdminSettings {
   socialLinks: SocialLinks;
 }
 
-export const formatMoney = (minor: number, currency = 'USD') =>
-  new Intl.NumberFormat('en', { style: 'currency', currency }).format(minor / 100);
+

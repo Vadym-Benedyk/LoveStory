@@ -7,7 +7,6 @@ import { adminMediaRouter } from './modules/media/media.routes.js';
 import { adminPricingRouter } from './modules/pricing/pricing.routes.js';
 import { adminReviewsRouter } from './modules/reviews/reviews.routes.js';
 import { adminSettingsRouter } from './modules/settings/settings.routes.js';
-import { publicFxRouter } from './modules/fx/fx.routes.js';
 
 export const apiRouter = Router();
 
@@ -17,7 +16,6 @@ apiRouter.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 // ---- Public API ----
 apiRouter.use('/', publicContentRouter); // /content /gallery /promotions /reviews /pricing
 apiRouter.use('/', publicBookingRouter); // /availability /quote /bookings
-apiRouter.use('/', publicFxRouter); // /exchange-rates (NBU, display-only)
 
 // ---- Admin API (guarded inside each router) ----
 apiRouter.use('/admin/auth', authRouter);
