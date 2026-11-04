@@ -6,18 +6,24 @@ import { requireAuth, requireRole } from '../../middleware/auth.js';
 import { publicWriteLimiter } from '../../middleware/rate-limit.js';
 import { prisma } from '../../lib/prisma.js';
 
+// Locales the site supports (kept in sync with client/src/i18n/translations.ts: Lang).
+const LOCALES = ['uk', 'en'] as const;
+const DEFAULT_LOCALE = 'uk';
+
 // ---- Public read routes for marketing content ----
 export const publicContentRouter = Router();
 
 publicContentRouter.get(
   '/content',
-  asyncHandler(async (_req, res) => {
+  validate({ query: z.object({ locale: z.enum(LOCALES).optional() }) }),
+  asyncHandler(async (req, res) => {
+    const locale = (req.query.locale as string | undefined) ?? DEFAULT_LOCALE;
     const [blocks, settings] = await Promise.all([
-      prisma.contentBlock.findMany(),
+      prisma.contentBlock.findMany({ where: { locale } }),
       prisma.siteSettings.findUnique({ where: { id: 'default' } }),
     ]);
     const copy = Object.fromEntries(blocks.map((b) => [b.key, b.value]));
-    res.json({ copy, settings });
+    res.json({ locale, copy, settings });
   }),
 );
 
@@ -99,20 +105,52 @@ publicContentRouter.post(
 export const adminContentRouter = Router();
 adminContentRouter.use(requireAuth, requireRole('OWNER', 'EDITOR'));
 
+adminContentRouter.get(
+  '/content',
+  validate({ query: z.object({ locale: z.enum(LOCALES).optional() }) }),
+  asyncHandler(async (req, res) => {
+    const locale = (req.query.locale as string | undefined) ?? DEFAULT_LOCALE;
+    const blocks = await prisma.contentBlock.findMany({
+      where: { locale },
+      orderBy: { key: 'asc' },
+    });
+    res.json({ locale, blocks });
+  }),
+);
+
 adminContentRouter.put(
   '/content',
-  validate({ body: z.object({ blocks: z.array(z.object({ key: z.string(), value: z.string() })) }) }),
+  validate({
+    body: z.object({
+      locale: z.enum(LOCALES).default(DEFAULT_LOCALE),
+      blocks: z.array(z.object({ key: z.string().min(1).max(120), value: z.string().max(20000) })),
+    }),
+  }),
   asyncHandler(async (req, res) => {
-    const { blocks } = req.body as { blocks: { key: string; value: string }[] };
+    const { locale, blocks } = req.body as { locale: string; blocks: { key: string; value: string }[] };
     await prisma.$transaction(
       blocks.map((b) =>
         prisma.contentBlock.upsert({
-          where: { key_locale: { key: b.key, locale: 'en' } },
+          where: { key_locale: { key: b.key, locale } },
           update: { value: b.value, updatedById: req.user!.id },
-          create: { key: b.key, locale: 'en', value: b.value, updatedById: req.user!.id },
+          create: { key: b.key, locale, value: b.value, updatedById: req.user!.id },
         }),
       ),
     );
+    res.json({ ok: true });
+  }),
+);
+
+adminContentRouter.delete(
+  '/content/:key',
+  validate({
+    params: z.object({ key: z.string().min(1) }),
+    query: z.object({ locale: z.enum(LOCALES).optional() }),
+  }),
+  asyncHandler(async (req, res) => {
+    const key = req.params.key as string;
+    const locale = (req.query.locale as string | undefined) ?? DEFAULT_LOCALE;
+    await prisma.contentBlock.delete({ where: { key_locale: { key, locale } } }).catch(() => null);
     res.json({ ok: true });
   }),
 );

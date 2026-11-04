@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "description": "Riverside guest house — boutique retreat website with manual-confirmation booking",
   "engines": {
-    "node": ">=20 <23"
+    "node": ">=20"
   },
   "workspaces": [
     "client",
@@ -25,6 +25,7 @@
     "db:sync": "npm --workspace server run prisma:push",
     "migrate": "npm --workspace server run prisma:push",
     "seed": "npm --workspace server run prisma:seed",
+    "admin:reset": "npm --workspace server run admin:reset --",
     "test": "npm --workspace server run test",
     "format": "prettier --write \"**/*.{ts,tsx,scss,json,md}\""
   },

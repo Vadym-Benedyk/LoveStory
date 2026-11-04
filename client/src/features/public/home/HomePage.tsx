@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { Box, Button, Container, Grid, Paper, Rating, Stack, Typography } from '@mui/material';
 import LandscapeIcon from '@mui/icons-material/Landscape';
@@ -8,14 +9,19 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
 import PlaceIcon from '@mui/icons-material/Place';
 import PetsIcon from '@mui/icons-material/Pets';
-import { useReviews, useSiteContent } from '@/shared/api/queries';
+import { useGallery, useReviews, useSiteContent } from '@/shared/api/queries';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { Lightbox } from '@/shared/ui/Lightbox';
 import styles from './HomePage.module.scss';
 
 export function HomePage() {
   const { data } = useSiteContent();
   const { data: reviews } = useReviews();
+  const { data: gallery } = useGallery();
   const { t } = useLanguage();
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const photos = gallery ?? [];
+  const heroPhoto = photos.find((p) => p.isHero);
 
   const amenities = [
     { icon: <PhishingIcon />, title: t('amenity.fishing.title'), body: t('amenity.fishing.body') },
@@ -28,7 +34,16 @@ export function HomePage() {
   return (
     <>
       {/* Hero */}
-      <section className={styles.hero}>
+      <section
+        className={styles.hero}
+        style={
+          heroPhoto
+            ? {
+                backgroundImage: `linear-gradient(rgba(43, 38, 32, 0.35), rgba(43, 38, 32, 0.55)), url(${heroPhoto.url})`,
+              }
+            : undefined
+        }
+      >
         <div className={styles.heroOverlay} />
         <Container className={styles.heroInner}>
           <Typography variant="h1" className={styles.heroTitle}>
@@ -54,19 +69,38 @@ export function HomePage() {
         <Typography className={styles.lead}>{t('about.body')}</Typography>
       </Container>
 
-      {/* Gallery placeholder (wired to /gallery in T4.4) */}
+      {/* Gallery */}
       <Container component="section" id="gallery" className={styles.section}>
         <Typography variant="h2" gutterBottom>
           {t('gallery.title')}
         </Typography>
         <Grid container spacing={2}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Grid key={i} item xs={6} md={4}>
-              <div className={styles.galleryTile} aria-hidden />
-            </Grid>
-          ))}
+          {photos.length > 0
+            ? photos.map((photo, i) => (
+                <Grid key={photo.id} item xs={6} md={4}>
+                  <button
+                    type="button"
+                    className={styles.galleryTile}
+                    style={{ backgroundImage: `url(${photo.url})` }}
+                    onClick={() => setLightboxIndex(i)}
+                    aria-label={photo.altText}
+                  />
+                </Grid>
+              ))
+            : Array.from({ length: 6 }).map((_, i) => (
+                <Grid key={i} item xs={6} md={4}>
+                  <div className={styles.galleryTile} aria-hidden />
+                </Grid>
+              ))}
         </Grid>
       </Container>
+
+      <Lightbox
+        images={photos.map((p) => ({ url: p.url, alt: p.altText }))}
+        index={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onChange={setLightboxIndex}
+      />
 
       {/* Amenities */}
       <Box component="section" id="amenities" className={styles.sectionAlt}>

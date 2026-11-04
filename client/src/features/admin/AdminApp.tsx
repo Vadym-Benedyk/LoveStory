@@ -6,6 +6,11 @@ import { AdminLayout } from './AdminLayout';
 import { DashboardPage } from './dashboard/DashboardPage';
 import { StatisticsPage } from './statistics/StatisticsPage';
 import { RequestsPage } from './requests/RequestsPage';
+import { CalendarPage } from './calendar/CalendarPage';
+import { BookingsPage } from './bookings/BookingsPage';
+import { ContentPage } from './content/ContentPage';
+import { GalleryPage } from './gallery/GalleryPage';
+import { PricingPage } from './pricing/PricingPage';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -34,7 +39,12 @@ export default function AdminApp() {
           <Route index element={<DashboardPage />} />
           <Route path="statistics" element={<StatisticsPage />} />
           <Route path="requests" element={<RequestsPage />} />
-          {/* calendar, bookings, content, gallery, promotions, pricing, reviews, settings
+          <Route path="calendar" element={<CalendarPage />} />
+          <Route path="bookings" element={<BookingsPage />} />
+          <Route path="content" element={<ContentPage />} />
+          <Route path="gallery" element={<GalleryPage />} />
+          <Route path="pricing" element={<PricingPage />} />
+          {/* promotions, reviews, settings
               follow the same pattern — see docs/product-design.md §1 */}
         </Route>
       </Routes>

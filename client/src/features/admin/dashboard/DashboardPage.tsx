@@ -2,8 +2,10 @@ import { Grid, Paper, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/shared/api/client';
 import type { Booking } from '@/shared/types';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 export function DashboardPage() {
+  const { t } = useLanguage();
   const { data: bookings } = useQuery({
     queryKey: ['admin', 'bookings'],
     queryFn: async () => (await api.get<Booking[]>('/admin/bookings')).data,
@@ -15,15 +17,15 @@ export function DashboardPage() {
     bookings?.filter((b) => b.status === 'CONFIRMED' && new Date(b.checkIn) >= new Date()).length ?? 0;
 
   const cards = [
-    { label: 'Pending requests', value: pending, hint: 'Call to confirm' },
-    { label: 'Confirmed bookings', value: confirmed, hint: 'Total' },
-    { label: 'Upcoming arrivals', value: upcoming, hint: 'From today' },
+    { label: t('admin.dashboard.pendingRequests'), value: pending, hint: t('admin.dashboard.pendingHint') },
+    { label: t('admin.dashboard.confirmedBookings'), value: confirmed, hint: t('admin.dashboard.confirmedHint') },
+    { label: t('admin.dashboard.upcomingArrivals'), value: upcoming, hint: t('admin.dashboard.upcomingHint') },
   ];
 
   return (
     <>
       <Typography variant="h4" gutterBottom>
-        Today
+        {t('admin.dashboard.title')}
       </Typography>
       <Grid container spacing={3}>
         {cards.map((c) => (

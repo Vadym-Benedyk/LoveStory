@@ -1,12 +1,10 @@
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcryptjs';
 import 'dotenv/config';
-
-const prisma = new PrismaClient();
+import { prisma } from '../src/lib/prisma.js';
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL ?? 'owner@example.com';
 const OWNER_PASSWORD = process.env.OWNER_PASSWORD ?? 'ChangeMe123!';
-const CURRENCY = process.env.DEFAULT_CURRENCY ?? 'USD';
+const CURRENCY = process.env.DEFAULT_CURRENCY ?? 'UAH';
 
 const defaultContent: Record<string, string> = {
   'hero.headline': 'Your private riverside escape',

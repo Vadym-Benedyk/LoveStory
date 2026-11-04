@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './client';
-import type { SiteContent, UnavailableRange } from '@/shared/types';
+import type { GalleryMedia, SiteContent, UnavailableRange } from '@/shared/types';
 
 export const useSiteContent = () =>
   useQuery({
@@ -27,7 +27,7 @@ export const useReviews = () =>
 export const useGallery = () =>
   useQuery({
     queryKey: ['gallery'],
-    queryFn: async () => (await api.get('/gallery')).data as any[],
+    queryFn: async () => (await api.get<GalleryMedia[]>('/gallery')).data,
   });
 
 export const useAvailability = (from: string, to: string) =>

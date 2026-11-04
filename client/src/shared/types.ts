@@ -43,6 +43,20 @@ export interface Booking {
   createdAt: string;
 }
 
+export type MediaCategory = 'HOUSE' | 'RIVER' | 'BBQ' | 'TUB' | 'NATURE' | 'OTHER';
+
+export interface GalleryMedia {
+  id: string;
+  type: 'IMAGE' | 'VIDEO';
+  url: string;
+  thumbnailUrl?: string | null;
+  title?: string | null;
+  altText: string;
+  category: MediaCategory;
+  isHero: boolean;
+  sortOrder: number;
+}
+
 export interface SiteContent {
   copy: Record<string, string>;
   settings: {

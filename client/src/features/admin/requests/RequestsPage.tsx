@@ -11,8 +11,10 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/shared/api/client';
 import { formatMoney, type Booking } from '@/shared/types';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 export function RequestsPage() {
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'bookings', 'PENDING'],
@@ -30,14 +32,16 @@ export function RequestsPage() {
     },
   });
 
-  if (isLoading) return <Typography>Loading…</Typography>;
+  if (isLoading) return <Typography>{t('admin.common.loading')}</Typography>;
 
   return (
     <>
       <Typography variant="h4" gutterBottom>
-        Pending requests
+        {t('admin.requests.title')}
       </Typography>
-      {data?.length === 0 && <Typography color="text.secondary">No pending requests.</Typography>}
+      {data?.length === 0 && (
+        <Typography color="text.secondary">{t('admin.requests.empty')}</Typography>
+      )}
       <Grid container spacing={3}>
         {data?.map((b) => (
           <Grid key={b.id} item xs={12} md={6}>
@@ -47,10 +51,14 @@ export function RequestsPage() {
                 <Chip label={b.reference} size="small" />
               </Stack>
               <Typography variant="body2" color="text.secondary">
-                {b.checkIn} → {b.checkOut} · {b.guestsCount} guests
+                {t('admin.requests.datesGuests', {
+                  checkIn: b.checkIn,
+                  checkOut: b.checkOut,
+                  count: b.guestsCount,
+                })}
               </Typography>
               <Typography variant="body2" sx={{ my: 1 }}>
-                Quote: {formatMoney(b.priceQuoteMinor, b.currency)}
+                {t('admin.requests.quote', { amount: formatMoney(b.priceQuoteMinor, b.currency) })}
               </Typography>
               {b.comments && (
                 <Box sx={{ bgcolor: 'background.default', p: 1.5, borderRadius: 2, mb: 1 }}>
@@ -82,7 +90,7 @@ export function RequestsPage() {
                   fullWidth
                   sx={{ width: { sm: 'auto' } }}
                 >
-                  Decline
+                  {t('admin.requests.decline')}
                 </Button>
                 <Button
                   variant="contained"
@@ -91,7 +99,7 @@ export function RequestsPage() {
                   fullWidth
                   sx={{ width: { sm: 'auto' } }}
                 >
-                  Confirm &amp; block dates
+                  {t('admin.requests.confirmAndBlock')}
                 </Button>
               </Stack>
             </Paper>

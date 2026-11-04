@@ -2,11 +2,13 @@ import { Grid, Paper, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/shared/api/client';
 import { formatMoney, type Booking } from '@/shared/types';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 const nights = (a: string, b: string) =>
   Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000));
 
 export function StatisticsPage() {
+  const { t } = useLanguage();
   const { data: bookings = [], isLoading } = useQuery({
     queryKey: ['admin', 'bookings'],
     queryFn: async () => (await api.get<Booking[]>('/admin/bookings')).data,
@@ -25,20 +27,20 @@ export function StatisticsPage() {
   const currency = bookings[0]?.currency ?? 'USD';
 
   const stats = [
-    { label: 'Confirmed revenue', value: formatMoney(revenueMinor, currency) },
-    { label: 'Confirmed bookings', value: confirmed.length },
-    { label: 'Pending requests', value: pending.length },
-    { label: 'Nights booked', value: nightsBooked },
-    { label: 'Avg. stay (nights)', value: avgStay ? avgStay.toFixed(1) : '—' },
-    { label: 'Request → confirm rate', value: `${conversion}%` },
+    { label: t('admin.statistics.confirmedRevenue'), value: formatMoney(revenueMinor, currency) },
+    { label: t('admin.statistics.confirmedBookings'), value: confirmed.length },
+    { label: t('admin.statistics.pendingRequests'), value: pending.length },
+    { label: t('admin.statistics.nightsBooked'), value: nightsBooked },
+    { label: t('admin.statistics.avgStay'), value: avgStay ? avgStay.toFixed(1) : '—' },
+    { label: t('admin.statistics.conversion'), value: `${conversion}%` },
   ];
 
-  if (isLoading) return <Typography>Loading…</Typography>;
+  if (isLoading) return <Typography>{t('admin.common.loading')}</Typography>;
 
   return (
     <>
       <Typography variant="h4" gutterBottom>
-        Statistics
+        {t('admin.statistics.title')}
       </Typography>
       <Grid container spacing={3}>
         {stats.map((s) => (
@@ -53,8 +55,7 @@ export function StatisticsPage() {
         ))}
       </Grid>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-        Computed from current booking data. Add date-range filters and charts (e.g. occupancy by
-        month) as a fast follow — see docs/project-development-plan.md.
+        {t('admin.statistics.footnote')}
       </Typography>
     </>
   );

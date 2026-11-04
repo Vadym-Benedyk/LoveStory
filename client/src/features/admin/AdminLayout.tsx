@@ -16,32 +16,36 @@ import {
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from './auth/AuthContext';
 import { BurgerIcon } from '@/shared/ui/BurgerIcon';
+import { useLanguage } from '@/i18n/LanguageContext';
+import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
 
 const DRAWER = 240;
-const nav = [
-  { to: '/admin', label: 'Dashboard', end: true },
-  { to: '/admin/statistics', label: 'Statistics' },
-  { to: '/admin/requests', label: 'Requests' },
-  { to: '/admin/calendar', label: 'Calendar' },
-  { to: '/admin/bookings', label: 'Bookings' },
-  { to: '/admin/content', label: 'Content' },
-  { to: '/admin/gallery', label: 'Gallery' },
-  { to: '/admin/promotions', label: 'Promotions' },
-  { to: '/admin/pricing', label: 'Pricing' },
-  { to: '/admin/reviews', label: 'Reviews' },
-  { to: '/admin/settings', label: 'Settings' },
+const navItems = [
+  { to: '/admin', key: 'admin.nav.dashboard', end: true },
+  { to: '/admin/statistics', key: 'admin.nav.statistics' },
+  { to: '/admin/requests', key: 'admin.nav.requests' },
+  { to: '/admin/calendar', key: 'admin.nav.calendar' },
+  { to: '/admin/bookings', key: 'admin.nav.bookings' },
+  { to: '/admin/content', key: 'admin.nav.content' },
+  { to: '/admin/gallery', key: 'admin.nav.gallery' },
+  { to: '/admin/promotions', key: 'admin.nav.promotions' },
+  { to: '/admin/pricing', key: 'admin.nav.pricing' },
+  { to: '/admin/reviews', key: 'admin.nav.reviews' },
+  { to: '/admin/settings', key: 'admin.nav.settings' },
 ];
 
 export function AdminLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const nav = navItems.map((n) => ({ ...n, label: t(n.key) }));
 
   const drawerContent = (
     <>
       <Toolbar>
         <Typography variant="h6" sx={{ fontFamily: "'Cormorant Garamond', serif" }}>
-          LoveStory · Admin
+          {t('admin.layout.brand')}
         </Typography>
       </Toolbar>
       <Divider />
@@ -78,7 +82,7 @@ export function AdminLayout() {
           <IconButton
             color="inherit"
             edge="start"
-            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            aria-label={mobileOpen ? t('admin.layout.closeMenu') : t('admin.layout.openMenu')}
             aria-expanded={mobileOpen}
             onClick={() => setMobileOpen((o) => !o)}
             sx={{ display: { md: 'none' } }}
@@ -88,9 +92,10 @@ export function AdminLayout() {
           <Typography variant="h6" sx={{ flex: 1, fontFamily: "'Cormorant Garamond', serif" }}>
             {/* brand sits in the AppBar on mobile, in the drawer on desktop */}
             <Box component="span" sx={{ display: { md: 'none' } }}>
-              LoveStory · Admin
+              {t('admin.layout.brand')}
             </Box>
           </Typography>
+          <LanguageSwitcher size="small" contrast />
           <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>
             {user?.name}
           </Typography>
@@ -104,7 +109,7 @@ export function AdminLayout() {
             sx={{ minWidth: 'auto' }}
           >
             <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-              Log out
+              {t('admin.layout.logout')}
             </Box>
           </Button>
         </Toolbar>
@@ -187,7 +192,7 @@ export function AdminLayout() {
             }}
             sx={{ borderColor: 'rgba(255,255,255,0.5)' }}
           >
-            Log out
+            {t('admin.layout.logout')}
           </Button>
         </Box>
       </Drawer>
