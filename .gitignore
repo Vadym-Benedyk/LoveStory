@@ -44,3 +44,5 @@ coverage/
 tmp/
 # Vite/Vitest config bundling leftovers
 *.timestamp-*.mjs
+# integration test SQLite file (server/vitest.config.ts)
+server/tests/.tmp/

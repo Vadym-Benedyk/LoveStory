@@ -154,18 +154,31 @@ export async function flagConflictingPendings(bookingId: string, checkIn: Date, 
   return overlaps.map((p) => p.id); // controller can surface these to the admin UI
 }
 
+// Allowed admin transitions (docs/product-design.md §4). CONFIRMED goes through confirmBooking;
+// EXPIRED is set only by the expiry job.
+const ALLOWED_FROM: Record<'DECLINED' | 'CANCELLED', string> = {
+  DECLINED: 'PENDING', // a request that was never accepted
+  CANCELLED: 'CONFIRMED', // an accepted stay that falls through → reopens the dates
+};
+
 export async function setStatus(
   id: string,
   status: 'DECLINED' | 'CANCELLED',
   actorId: string,
   internalNotes?: string,
 ) {
-  const booking = await prisma.booking.findUnique({ where: { id } });
-  if (!booking) throw NotFound('Booking not found');
-  const updated = await prisma.booking.update({
-    where: { id },
-    data: { status, internalNotes: internalNotes ?? booking.internalNotes },
+  const from = ALLOWED_FROM[status];
+  // Conditional update = atomic check-and-set: a concurrent confirm/decline can't be overwritten.
+  const res = await prisma.booking.updateMany({
+    where: { id, status: from },
+    data: { status, ...(internalNotes !== undefined ? { internalNotes } : {}) },
   });
+  if (res.count === 0) {
+    const current = await prisma.booking.findUnique({ where: { id }, select: { status: true } });
+    if (!current) throw NotFound('Booking not found');
+    throw Conflict(`Cannot change a ${current.status} booking to ${status}`);
+  }
+  const updated = await prisma.booking.findUniqueOrThrow({ where: { id } });
   await prisma.auditLog.create({
     data: { actorId, action: `BOOKING_${status}`, entity: 'Booking', entityId: id },
   });

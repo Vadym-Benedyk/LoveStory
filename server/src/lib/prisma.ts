@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
-import { isProd } from '../config/env.js';
+import { env, isProd } from '../config/env.js';
 import { pinSqliteUrl } from './sqlite-path.js';
 
 // Pin the SQLite file to server/prisma/dev.db regardless of the working directory, so the
@@ -13,5 +13,5 @@ pinSqliteUrl(prismaDir);
 
 export const prisma = new PrismaClient({
   adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL! }),
-  log: isProd ? ['warn', 'error'] : ['query', 'warn', 'error'],
+  log: isProd || env.NODE_ENV === 'test' ? ['warn', 'error'] : ['query', 'warn', 'error'],
 });
