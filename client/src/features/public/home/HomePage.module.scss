@@ -145,6 +145,13 @@
   overflow: hidden;
 }
 
+.map {
+  display: block;
+  width: 100%;
+  height: clamp(280px, 50vw, 450px);
+  border: 0;
+}
+
 .mapPlaceholder {
   display: grid;
   place-items: center;

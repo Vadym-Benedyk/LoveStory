@@ -6,6 +6,7 @@ import { adminCalendarRouter } from './modules/calendar/calendar.routes.js';
 import { adminMediaRouter } from './modules/media/media.routes.js';
 import { adminPricingRouter } from './modules/pricing/pricing.routes.js';
 import { adminReviewsRouter } from './modules/reviews/reviews.routes.js';
+import { adminSettingsRouter } from './modules/settings/settings.routes.js';
 
 export const apiRouter = Router();
 
@@ -23,9 +24,10 @@ apiRouter.use('/admin/calendar', adminCalendarRouter); // /admin/calendar + /blo
 apiRouter.use('/admin/media', adminMediaRouter); // /admin/media (+ /presign, /reorder, /:id)
 apiRouter.use('/admin/pricing', adminPricingRouter); // /admin/pricing (+ /rules, /addons)
 apiRouter.use('/admin/reviews', adminReviewsRouter); // moderation: list, approve/hide/reply, delete
+apiRouter.use('/admin/settings', adminSettingsRouter); // property, contacts, map, notifications
 // Mounted on bare '/admin' with a router-level OWNER/EDITOR guard, so it must stay LAST:
 // anything mounted after it would inherit that guard (e.g. a MANAGER would get 403).
-apiRouter.use('/admin', adminContentRouter); // /admin/content /admin/settings
+apiRouter.use('/admin', adminContentRouter); // /admin/content
 
 // Additional admin modules (promotions) follow the
 // same pattern — see docs/project-development-plan.md epics E6/E7.

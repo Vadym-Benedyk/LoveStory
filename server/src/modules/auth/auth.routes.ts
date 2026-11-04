@@ -50,3 +50,19 @@ authRouter.get(
     res.json(await service.me(req.user!.id));
   }),
 );
+
+authRouter.post(
+  '/password',
+  requireAuth,
+  loginLimiter, // same brute-force protection as login: this endpoint checks a password too
+  validate({
+    body: z.object({
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(10, 'At least 10 characters').max(200),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    await service.changePassword(req.user!.id, req.body.currentPassword, req.body.newPassword);
+    res.json({ ok: true });
+  }),
+);

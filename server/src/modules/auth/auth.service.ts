@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
-import { Unauthorized } from '../../lib/errors.js';
+import { AppError, BadRequest, Unauthorized } from '../../lib/errors.js';
 import type { AuthUser, Role } from '../../middleware/auth.js';
 
 function signAccess(user: AuthUser) {
@@ -47,4 +47,23 @@ export async function me(id: string) {
   });
   if (!user) throw Unauthorized();
   return user;
+}
+
+// Change the signed-in user's own password. Requires the current one.
+export async function changePassword(id: string, currentPassword: string, newPassword: string) {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user || !user.isActive) throw Unauthorized();
+  if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    throw new AppError(400, 'Current password is incorrect', 'WRONG_PASSWORD');
+  }
+  if (currentPassword === newPassword) {
+    throw BadRequest('New password must differ from the current one');
+  }
+  await prisma.user.update({
+    where: { id },
+    data: { passwordHash: await bcrypt.hash(newPassword, 10) },
+  });
+  await prisma.auditLog.create({
+    data: { actorId: id, action: 'PASSWORD_CHANGED', entity: 'User', entityId: id },
+  });
 }

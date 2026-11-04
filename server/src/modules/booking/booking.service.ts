@@ -52,6 +52,15 @@ export async function createBookingRequest(input: CreateBookingInput) {
   const checkOut = toDateOnly(input.checkOut);
   if (checkIn < toDateOnly(new Date())) throw BadRequest('Check-in cannot be in the past');
 
+  // Capacity is owner-editable in admin Settings.
+  const settings = await prisma.siteSettings.findUnique({
+    where: { id: 'default' },
+    select: { capacity: true },
+  });
+  if (settings && input.guestsCount > settings.capacity) {
+    throw BadRequest(`The house sleeps up to ${settings.capacity} guests`);
+  }
+
   // Re-check availability server-side (client view is only a hint).
   const available = await isRangeAvailable(checkIn, checkOut);
   if (!available) throw Conflict('These dates are no longer available');

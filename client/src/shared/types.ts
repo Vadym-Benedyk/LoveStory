@@ -85,10 +85,27 @@ export interface SiteContent {
     areaSqm: number;
     capacity: number;
     phone: string;
+    whatsapp?: string | null;
     email: string;
     address: string;
-    mapEmbed?: string | null;
+    mapEmbedUrl: string | null; // validated Google Maps embed URL (never raw HTML)
+    socialLinks: SocialLinks;
   } | null;
+}
+
+export type SocialNetwork = 'instagram' | 'tiktok';
+export type SocialLinks = Partial<Record<SocialNetwork, string>>;
+
+// Admin Settings form (GET/PUT /admin/settings).
+export interface AdminSettings {
+  capacity: number;
+  phone: string;
+  email: string;
+  address: string;
+  mapEmbed: string;
+  mapEmbedValid?: boolean; // server-computed; read-only
+  notificationEmail: string;
+  socialLinks: SocialLinks;
 }
 
 export const formatMoney = (minor: number, currency = 'USD') =>

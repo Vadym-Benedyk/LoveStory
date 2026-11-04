@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/shared/api/client';
-import type { Booking, Review, ReviewStatus } from '@/shared/types';
+import type { AdminSettings, Booking, Review, ReviewStatus } from '@/shared/types';
 
 export interface CalendarBlock {
   id: string;
@@ -323,3 +323,28 @@ export function useReviewActions() {
 
   return { update, remove };
 }
+
+// ---- Settings (owner-only) ----
+export const useAdminSettings = () =>
+  useQuery({
+    queryKey: ['admin', 'settings'],
+    queryFn: async () => (await api.get<AdminSettings>('/admin/settings')).data,
+  });
+
+export function useSaveSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: Partial<AdminSettings>) =>
+      (await api.put<AdminSettings>('/admin/settings', patch)).data,
+    onSuccess: (data) => {
+      qc.setQueryData(['admin', 'settings'], data);
+      qc.invalidateQueries({ queryKey: ['content'] }); // public contacts/map/social links
+    },
+  });
+}
+
+export const useChangePassword = () =>
+  useMutation({
+    mutationFn: async (vars: { currentPassword: string; newPassword: string }) =>
+      (await api.post('/admin/auth/password', vars)).data,
+  });

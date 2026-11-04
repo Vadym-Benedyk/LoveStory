@@ -177,8 +177,16 @@ export function HomePage() {
         <Typography className={styles.lead}>
           {data?.settings?.address || t('location.fallback')}
         </Typography>
-        {data?.settings?.mapEmbed ? (
-          <Box className={styles.map} dangerouslySetInnerHTML={{ __html: data.settings.mapEmbed }} />
+        {data?.settings?.mapEmbedUrl ? (
+          // The server only ever returns a validated Google Maps embed URL — no raw HTML.
+          <iframe
+            className={styles.map}
+            src={data.settings.mapEmbedUrl}
+            title={t('location.title')}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            allowFullScreen
+          />
         ) : (
           <div className={styles.mapPlaceholder}>{t('location.mapPlaceholder')}</div>
         )}

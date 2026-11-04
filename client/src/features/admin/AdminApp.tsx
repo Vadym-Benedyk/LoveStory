@@ -12,6 +12,7 @@ import { ContentPage } from './content/ContentPage';
 import { GalleryPage } from './gallery/GalleryPage';
 import { PricingPage } from './pricing/PricingPage';
 import { ReviewsPage } from './reviews/ReviewsPage';
+import { SettingsPage } from './settings/SettingsPage';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -46,7 +47,8 @@ export default function AdminApp() {
           <Route path="gallery" element={<GalleryPage />} />
           <Route path="pricing" element={<PricingPage />} />
           <Route path="reviews" element={<ReviewsPage />} />
-          {/* promotions, settings
+          <Route path="settings" element={<SettingsPage />} />
+          {/* promotions
               follow the same pattern — see docs/product-design.md §1 */}
         </Route>
       </Routes>

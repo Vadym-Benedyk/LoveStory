@@ -18,6 +18,8 @@ import { BurgerIcon } from '@/shared/ui/BurgerIcon';
 import { TikTokIcon } from '@/shared/ui/TikTokIcon';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
+import { useSiteContent } from '@/shared/api/queries';
+import type { SocialNetwork } from '@/shared/types';
 import styles from './PublicLayout.module.scss';
 
 const navLinks = [
@@ -29,10 +31,10 @@ const navLinks = [
   { key: 'nav.contact', href: '/#contact' },
 ];
 
-// Owner can swap these for real handles (or wire to SiteSettings.socialLinks later).
-const socialLinks = [
-  { label: 'Instagram', href: 'https://instagram.com/', icon: <InstagramIcon /> },
-  { label: 'TikTok', href: 'https://tiktok.com/', icon: <TikTokIcon /> },
+// Links come from admin Settings; a network without a link is not shown.
+const SOCIAL_NETWORKS: { key: SocialNetwork; label: string; icon: JSX.Element }[] = [
+  { key: 'instagram', label: 'Instagram', icon: <InstagramIcon /> },
+  { key: 'tiktok', label: 'TikTok', icon: <TikTokIcon /> },
 ];
 
 const currentYear = new Date().getFullYear();
@@ -41,6 +43,11 @@ export function PublicLayout() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { data: content } = useSiteContent();
+  const socialLinks = SOCIAL_NETWORKS.flatMap((n) => {
+    const href = content?.settings?.socialLinks?.[n.key];
+    return href ? [{ ...n, href }] : [];
+  });
 
   const handleBrandClick = () => {
     navigate('/');
@@ -193,24 +200,26 @@ export function PublicLayout() {
               <p>{t('footer.tagline')}</p>
             </div>
 
-            <div className={styles.footerSocial}>
-              <span className={styles.footerSocialLabel}>{t('footer.follow')}</span>
-              <div className={styles.footerSocialIcons}>
-                {socialLinks.map((s) => (
-                  <IconButton
-                    key={s.label}
-                    component="a"
-                    href={s.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={s.label}
-                    className={styles.footerSocialBtn}
-                  >
-                    {s.icon}
-                  </IconButton>
-                ))}
+            {socialLinks.length > 0 && (
+              <div className={styles.footerSocial}>
+                <span className={styles.footerSocialLabel}>{t('footer.follow')}</span>
+                <div className={styles.footerSocialIcons}>
+                  {socialLinks.map((s) => (
+                    <IconButton
+                      key={s.key}
+                      component="a"
+                      href={s.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={s.label}
+                      className={styles.footerSocialBtn}
+                    >
+                      {s.icon}
+                    </IconButton>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className={styles.footerBottom}>

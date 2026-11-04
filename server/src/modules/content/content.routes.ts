@@ -5,6 +5,7 @@ import { validate } from '../../middleware/validate.js';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
 import { publicWriteLimiter } from '../../middleware/rate-limit.js';
 import { prisma } from '../../lib/prisma.js';
+import { toPublicSettings } from '../settings/settings.routes.js';
 
 // Locales the site supports (kept in sync with client/src/i18n/translations.ts: Lang).
 const LOCALES = ['uk', 'en'] as const;
@@ -23,7 +24,7 @@ publicContentRouter.get(
       prisma.siteSettings.findUnique({ where: { id: 'default' } }),
     ]);
     const copy = Object.fromEntries(blocks.map((b) => [b.key, b.value]));
-    res.json({ locale, copy, settings });
+    res.json({ locale, copy, settings: toPublicSettings(settings) });
   }),
 );
 
@@ -112,7 +113,7 @@ publicContentRouter.post(
   }),
 );
 
-// ---- Admin content/settings editing (pattern; extend per docs/product-design §1) ----
+// ---- Admin content editing (pattern; extend per docs/product-design §1) ----
 export const adminContentRouter = Router();
 adminContentRouter.use(requireAuth, requireRole('OWNER', 'EDITOR'));
 
@@ -166,10 +167,4 @@ adminContentRouter.delete(
   }),
 );
 
-adminContentRouter.put(
-  '/settings',
-  asyncHandler(async (req, res) => {
-    const settings = await prisma.siteSettings.update({ where: { id: 'default' }, data: req.body });
-    res.json(settings);
-  }),
-);
+// Settings moved to modules/settings (validated, owner-only).
