@@ -17,6 +17,11 @@
   background: t.$cream;
   border-radius: t.$radius-lg;
   box-shadow: t.$shadow-soft;
+
+  // Small phones (≤ 400px): every pixel counts for the 7-column calendar.
+  @media (max-width: 400px) {
+    padding: 0.75rem;
+  }
 }
 
 .legend {
