@@ -10,7 +10,7 @@ export const uk: Record<string, string> = {
   'nav.location': 'Розташування',
   'nav.contact': 'Контакти',
   // cta / buttons
-  'cta.checkAvailability': 'Перевірити дати',
+  'cta.checkAvailability': 'Перевірити доступні дати',
   'cta.bookNow': 'Забронювати',
   'cta.viewHouse': 'Подивитися дім',
   'cta.seeDatesPrices': 'Дати та ціни',
@@ -23,7 +23,7 @@ export const uk: Record<string, string> = {
   'about.body':
     'Ізольований від урбанії, повна автономія на березі річки, це місце створене для того, щоб уповільнитися. Повна приватність, шум води і жодних думок, окрім відпочинку. Місце сили та єднання з природою.',
   // gallery
-  'gallery.title': 'Наш прихисток',
+  'gallery.title': 'Локація',
   // amenities
   'amenities.title': 'Що робить його особливим',
   'amenity.fishing.title': 'Риболовля на річці',
@@ -38,7 +38,7 @@ export const uk: Record<string, string> = {
   'amenity.wildlife.body':
     'Зустрічайте та годуйте чарівних диких тварин — лебеді тут завжди.',
   // pricing
-  'pricing.title': 'Прості та прозорі ціни',
+  'pricing.title': 'Доступні та прозорі ціни',
   // reviews
   'reviews.title': 'Історії гостей',
   'reviews.ownerReply': 'Адміністратор',
@@ -70,13 +70,23 @@ export const uk: Record<string, string> = {
   'admin.content.where.contact': 'Розділ «Контакти»',
   'admin.content.where.terms': 'Вся сторінка /terms (посилання у футері)',
   'admin.content.hint.pricing': 'Тарифи, додаткові послуги та список «Що входить» редагуються у вкладці «Ціни».',
-  'admin.content.hint.contact': 'Телефон, пошта, адреса та соцмережі — у вкладці «Налаштування».',
+  'admin.content.hint.contact': 'Телефон та сповіщення про заявки — нижче, вони синхронізовані з вкладкою «Налаштування».',
   'admin.content.openPage': 'Відкрити сторінку',
   'admin.content.openSection': 'Показати на сайті',
   'admin.content.style.font': 'Шрифт',
   'admin.content.style.color': 'Колір тексту',
   'admin.content.style.default': 'Стандартний',
   'admin.content.style.reset': 'Скинути вигляд',
+  'admin.content.contactSettings.title': 'Телефон і сповіщення',
+  'admin.content.contactSettings.hint': 'Ці дані спільні для обох мов і синхронізовані з розділом «Налаштування» — їх можна змінити тут або там, це одні й ті самі значення. Email, адреса, мапа та соцмережі — лише в',
+  'admin.content.contactSettings.phoneHelp': 'Показується на сайті в розділі «Контакти» (кнопка «Зателефонувати»).',
+  'admin.content.contactSettings.notifyHelp': 'Куди надходить лист про нову заявку. На сайті не показується.',
+  'admin.content.contactSettings.save': 'Зберегти телефон і сповіщення',
+  'admin.content.contactSettings.ownerOnly': 'Телефон і email для сповіщень змінює власник у розділі «Налаштування».',
+  'admin.settings.notifySame': 'Така сама, як email на сайті',
+  'admin.settings.notifySameTo': 'Листи про нові заявки надходитимуть на {email} (email із розділу «Контакти на сайті»).',
+  'admin.settings.notifySameEmpty': 'Email на сайті не вказано — листи підуть на адресу з конфігурації сервера (якщо вона задана). Вкажіть email у розділі «Контакти на сайті».',
+  'admin.settings.phoneInvalid': 'Введіть номер повністю: +380 (XX) XXX-XX-XX.',
   'footer.follow': 'Слідкуйте за нами',
   'footer.rights': 'Усі права захищені.',
   'footer.producedBy': 'Створено',
@@ -210,7 +220,7 @@ export const uk: Record<string, string> = {
   'admin.content.infoBanner': 'Тут зібрано редагований текст сайту — по сторінках і розділах. Під кожним блоком вказано, де саме він показується. Зараз редагуєте мову: {lang}. Якщо поле порожнє, на сайті використовується вбудований текст.',
   'admin.content.group.hero': 'Головний блок',
   'admin.content.group.about': 'Про дім',
-  'admin.content.group.contact': 'Контакти: примітка',
+  'admin.content.group.contact': 'Контакти',
   'admin.content.field.heroHeadline': 'Заголовок',
   'admin.content.field.heroSubheadline': 'Підзаголовок',
   'admin.content.field.aboutTitle': 'Заголовок розділу',

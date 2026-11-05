@@ -23,6 +23,7 @@ import { useAvailability, useSiteContent } from '@/shared/api/queries';
 import type { Quote } from '@/shared/types';
 import { usePrice } from '@/shared/usePrice';
 import { PhoneMaskInput, isCompleteUaPhone } from '@/shared/ui/PhoneMaskInput';
+import { isConflictError } from '../errors';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useToast } from '@/shared/ui/ToastProvider';
 import { useCreateBooking } from '../api';
@@ -162,7 +163,7 @@ function NewBookingDialog({
         onError: (err) =>
           toast.error(
             t(
-              (err as { response?: { status?: number } })?.response?.status === 409
+              isConflictError(err)
                 ? 'admin.newBooking.errTaken'
                 : 'admin.newBooking.errGeneric',
             ),

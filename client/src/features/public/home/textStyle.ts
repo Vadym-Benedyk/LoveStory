@@ -3,7 +3,7 @@
 import type { CSSProperties } from 'react';
 
 // All of these have Cyrillic glyphs (Ukrainian text), loaded in index.html / main.tsx.
-export const HERO_FONTS: { key: string; label: string; css: string }[] = [
+export const TEXT_FONTS: { key: string; label: string; css: string }[] = [
   { key: 'cormorant', label: 'Cormorant Garamond', css: "'Cormorant Garamond', Georgia, serif" },
   { key: 'playfair', label: 'Playfair Display', css: "'Playfair Display', Georgia, serif" },
   { key: 'lora', label: 'Lora', css: "'Lora', Georgia, serif" },
@@ -13,7 +13,8 @@ export const HERO_FONTS: { key: string; label: string; css: string }[] = [
   { key: 'marck', label: 'Marck Script', css: "'Marck Script', cursive" },
 ];
 
-export const HERO_COLORS: { value: string; label: string }[] = [
+// Swatches for text on top of the hero photo.
+export const TEXT_COLORS: { value: string; label: string }[] = [
   { value: '#fbf8f1', label: 'Cream' },
   { value: '#ffffff', label: 'White' },
   { value: '#f3d9a4', label: 'Sand' },
@@ -23,8 +24,8 @@ export const HERO_COLORS: { value: string; label: string }[] = [
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
-export function heroTextStyle(font?: string, color?: string): CSSProperties | undefined {
-  const css = HERO_FONTS.find((f) => f.key === font)?.css;
+export function textStyle(font?: string, color?: string): CSSProperties | undefined {
+  const css = TEXT_FONTS.find((f) => f.key === font)?.css;
   const col = color && HEX.test(color) ? color : undefined;
   return css || col ? { ...(css ? { fontFamily: css } : {}), ...(col ? { color: col } : {}) } : undefined;
 }

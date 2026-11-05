@@ -34,6 +34,7 @@ function toAdminSettings(s: SiteSettings) {
     // Lets the admin preview the map only when it is a valid embed (legacy values may not be).
     mapEmbedValid: Boolean(s.mapEmbed && isMapEmbedUrl(s.mapEmbed)),
     notificationEmail: s.notificationEmail,
+    notifyToSiteEmail: s.notifyToSiteEmail,
     socialLinks: parseSocialLinks(s.socialLinks),
   };
 }

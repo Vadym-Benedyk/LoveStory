@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, FormControlLabel, Paper, Stack, TextField, Typography } from '@mui/material';
 import type { AdminSettings } from '@/shared/types';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useToast } from '@/shared/ui/ToastProvider';
+import { PhoneMaskInput, formatUaPhone, isCompleteUaPhone, isEmptyPhone, phoneToDigits } from '@/shared/ui/PhoneMaskInput';
 import { useAuth } from '../auth/AuthContext';
 import { useAdminSettings, useChangePassword, useSaveSettings } from '../api';
 
@@ -21,11 +22,12 @@ type Form = Omit<AdminSettings, 'capacity' | 'socialLinks' | 'mapEmbedValid'> & 
 
 const toForm = (s: AdminSettings): Form => ({
   capacity: String(s.capacity),
-  phone: s.phone,
+  phone: phoneToDigits(s.phone), // unmasked digits while editing
   email: s.email,
   address: s.address,
   mapEmbed: s.mapEmbed,
   notificationEmail: s.notificationEmail,
+  notifyToSiteEmail: s.notifyToSiteEmail,
   instagram: s.socialLinks.instagram ?? '',
   tiktok: s.socialLinks.tiktok ?? '',
 });
@@ -72,15 +74,21 @@ function SiteSettingsForm() {
     error: Boolean(fieldError(name)),
   });
 
+  const phoneUntouched = form.phone === phoneToDigits(data?.phone ?? '');
+  const phoneInvalid = !phoneUntouched && !isEmptyPhone(form.phone) && !isCompleteUaPhone(form.phone);
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
+    if (phoneInvalid) return;
     save.mutate({
       capacity: Number(form.capacity),
-      phone: form.phone,
+      // Untouched: keep what is stored (may be an older free-text number the mask can't hold).
+      phone: phoneUntouched ? (data?.phone ?? '') : isEmptyPhone(form.phone) ? '' : formatUaPhone(form.phone),
       email: form.email,
       address: form.address,
       mapEmbed: form.mapEmbed,
       notificationEmail: form.notificationEmail,
+      notifyToSiteEmail: form.notifyToSiteEmail,
       socialLinks: { instagram: form.instagram, tiktok: form.tiktok },
     },
       {
@@ -94,7 +102,15 @@ function SiteSettingsForm() {
     <Box component="form" onSubmit={onSubmit} noValidate>
       <Stack spacing={3}>
         <Section title={t('admin.settings.contacts.title')} hint={t('admin.settings.contacts.hint')}>
-          <TextField label={t('admin.settings.phone')} type="tel" placeholder="+380 50 123 45 67" {...field('phone')} />
+          <TextField
+            label={t('admin.settings.phone')}
+            type="tel"
+            {...field('phone')}
+            InputProps={{ inputComponent: PhoneMaskInput as never }}
+            InputLabelProps={{ shrink: true }}
+            error={phoneInvalid}
+            helperText={phoneInvalid ? t('admin.settings.phoneInvalid') : undefined}
+          />
           <TextField
             label={t('admin.settings.email')}
             type="email"
@@ -147,16 +163,33 @@ function SiteSettingsForm() {
         </Section>
 
         <Section title={t('admin.settings.notify.title')} hint={t('admin.settings.notify.hint')}>
-          <TextField
-            label={t('admin.settings.notificationEmail')}
-            type="email"
-            {...field('notificationEmail')}
-            helperText={
-              fieldError('notificationEmail')
-                ? t('admin.settings.invalidEmail')
-                : t('admin.settings.notificationEmailHelp')
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={form.notifyToSiteEmail}
+                onChange={(e) => setForm({ ...form, notifyToSiteEmail: e.target.checked })}
+              />
             }
+            label={t('admin.settings.notifySame')}
           />
+          {form.notifyToSiteEmail ? (
+            <Typography variant="body2" color="text.secondary">
+              {form.email
+                ? t('admin.settings.notifySameTo', { email: form.email })
+                : t('admin.settings.notifySameEmpty')}
+            </Typography>
+          ) : (
+            <TextField
+              label={t('admin.settings.notificationEmail')}
+              type="email"
+              {...field('notificationEmail')}
+              helperText={
+                fieldError('notificationEmail')
+                  ? t('admin.settings.invalidEmail')
+                  : t('admin.settings.notificationEmailHelp')
+              }
+            />
+          )}
         </Section>
 
         <Box>
@@ -254,7 +287,7 @@ export function SettingsPage() {
   const isOwner = user?.role === 'OWNER';
 
   return (
-    <Box sx={{ maxWidth: 720 }}>
+    <Box>
       <Typography variant="h4" gutterBottom>
         {t('admin.settings.title')}
       </Typography>

@@ -10,7 +10,7 @@ import EmailIcon from '@mui/icons-material/Email';
 import PlaceIcon from '@mui/icons-material/Place';
 import PetsIcon from '@mui/icons-material/Pets';
 import { PricingSection } from './PricingSection';
-import { heroTextStyle } from './heroStyle';
+import { textStyle } from './textStyle';
 import { useGallery, useReviews, useSiteContent } from '@/shared/api/queries';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { Lightbox } from '@/shared/ui/Lightbox';
@@ -53,13 +53,13 @@ export function HomePage() {
           <Typography
             variant="h1"
             className={styles.heroTitle}
-            style={heroTextStyle(data?.copy?.['hero.headline.font'], data?.copy?.['hero.headline.color'])}
+            style={textStyle(data?.copy?.['hero.headline.font'], data?.copy?.['hero.headline.color'])}
           >
             {copy('hero.headline')}
           </Typography>
           <Typography
             className={styles.heroSub}
-            style={heroTextStyle(data?.copy?.['hero.subheadline.font'], data?.copy?.['hero.subheadline.color'])}
+            style={textStyle(data?.copy?.['hero.subheadline.font'], data?.copy?.['hero.subheadline.color'])}
           >
             {copy('hero.subheadline')}
           </Typography>
@@ -79,7 +79,9 @@ export function HomePage() {
         <Typography variant="h2" gutterBottom>
           {copy('about.title')}
         </Typography>
-        <Typography className={styles.lead}>{copy('about.body')}</Typography>
+        <Typography className={styles.lead} style={{ whiteSpace: 'pre-line' }}>
+          {copy('about.body')}
+        </Typography>
       </Container>
 
       {/* Gallery */}
@@ -211,7 +213,7 @@ export function HomePage() {
                   className={styles.contactCard}
                   elevation={0}
                   component="a"
-                  href={`tel:${data.settings.phone}`}
+                  href={`tel:${data.settings.phone.replace(/[^\d+]/g, '')}`}
                 >
                   <span className={styles.amenityIcon}>
                     <PhoneIcon />
@@ -249,9 +251,6 @@ export function HomePage() {
               </Grid>
             )}
           </Grid>
-          <Button size="large" variant="contained" component={RouterLink} to="/booking" sx={{ mt: 4 }}>
-            {t('cta.checkAvailability')}
-          </Button>
         </Container>
       </Box>
     </>

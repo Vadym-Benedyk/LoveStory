@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { useAuth } from './auth/AuthContext';
+import { usePendingCount } from './api';
 import { BurgerIcon } from '@/shared/ui/BurgerIcon';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
@@ -34,11 +35,40 @@ const navItems = [
   { to: '/admin/settings', key: 'admin.nav.settings' },
 ];
 
+// Small count pill after a menu label (hidden when there is nothing to show).
+function CountBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <Box
+      component="span"
+      aria-label={String(count)}
+      sx={{
+        ml: 1,
+        minWidth: 22,
+        height: 22,
+        px: 0.75,
+        borderRadius: 11,
+        bgcolor: 'error.main',
+        color: 'common.white',
+        fontSize: 13,
+        fontWeight: 700,
+        lineHeight: '22px',
+        textAlign: 'center',
+        flexShrink: 0,
+      }}
+    >
+      {count > 99 ? '99+' : count}
+    </Box>
+  );
+}
+
 export function AdminLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { data: pending = 0 } = usePendingCount();
+  const badgeFor = (to: string) => (to === '/admin/requests' ? pending : 0);
   const nav = navItems.map((n) => ({ ...n, label: t(n.key) }));
 
   const drawerContent = (
@@ -60,6 +90,7 @@ export function AdminLayout() {
             sx={{ '&.active': { bgcolor: 'action.selected' } }}
           >
             <ListItemText primary={n.label} />
+            <CountBadge count={badgeFor(n.to)} />
           </ListItemButton>
         ))}
       </List>
@@ -177,6 +208,7 @@ export function AdminLayout() {
                     },
                   }}
                 />
+                <CountBadge count={badgeFor(n.to)} />
               </ListItemButton>
             ))}
           </List>

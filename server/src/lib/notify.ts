@@ -25,11 +25,13 @@ function getMailer(): MailSender | null {
 }
 
 // Admin-editable address (Settings) wins over the env default.
-async function resolveRecipientEmail(): Promise<string | undefined> {
+// With "same as the site email" on, the public contact email is the recipient.
+export async function resolveRecipientEmail(): Promise<string | undefined> {
   const settings = await prisma.siteSettings
-    .findUnique({ where: { id: 'default' }, select: { notificationEmail: true } })
+    .findUnique({ where: { id: 'default' }, select: { notificationEmail: true, notifyToSiteEmail: true, email: true } })
     .catch(() => null);
-  return settings?.notificationEmail || env.NOTIFY_EMAIL || undefined;
+  const own = settings?.notifyToSiteEmail ? settings.email : settings?.notificationEmail;
+  return own || env.NOTIFY_EMAIL || undefined;
 }
 
 export function adminRequestsUrl(): string {

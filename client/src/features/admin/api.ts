@@ -28,6 +28,16 @@ export const useBookings = (status?: string, period?: BookingPeriod) =>
       (await api.get<Booking[]>('/admin/bookings', { params: { status, period } })).data,
   });
 
+// Number of new (unprocessed) requests, for the sidebar badge. Same query key as the Requests page,
+// so both share one cache entry; polled so a request that arrives while the admin is open shows up.
+export const usePendingCount = () =>
+  useQuery({
+    queryKey: ['admin', 'bookings', 'PENDING'],
+    queryFn: async () => (await api.get<Booking[]>('/admin/bookings', { params: { status: 'PENDING' } })).data,
+    refetchInterval: 60_000,
+    select: (rows) => rows.length,
+  });
+
 export function useBookingActions() {
   const qc = useQueryClient();
   const invalidate = () => {

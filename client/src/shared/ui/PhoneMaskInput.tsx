@@ -43,5 +43,23 @@ export const PhoneMaskInput = forwardRef<HTMLInputElement, Props>(function Phone
   );
 });
 
+// Stored phone ("+380 (50) 111-22-33", or any older free text) -> unmasked digits for the input.
+export function phoneToDigits(stored: string): string {
+  const d = stored.replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('380')) return d.slice(0, 12);
+  if (d.startsWith('0')) return `38${d}`.slice(0, 12);
+  return d.slice(0, 12);
+}
+
+// Complete unmasked digits -> the text shown on the site: "+380 (50) 111-22-33".
+export function formatUaPhone(digits: string): string {
+  const m = /^380(\d{2})(\d{3})(\d{2})(\d{2})$/.exec(digits);
+  return m ? `+380 (${m[1]}) ${m[2]}-${m[3]}-${m[4]}` : '';
+}
+
+// What the input is "empty" at: only the fixed country code is typed.
+export const isEmptyPhone = (digits: string) => digits === '' || digits === '380';
+
 // Unmasked value is complete: "380" + 9 digits.
 export const isCompleteUaPhone = (digits: string) => /^380\d{9}$/.test(digits);

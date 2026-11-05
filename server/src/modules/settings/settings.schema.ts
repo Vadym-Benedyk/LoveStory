@@ -79,6 +79,7 @@ export const updateSettingsSchema = z
         return url;
       }),
     notificationEmail: optionalEmail,
+    notifyToSiteEmail: z.boolean(),
     socialLinks: z.object({ instagram: optionalHttpsUrl, tiktok: optionalHttpsUrl }).partial(),
   })
   .partial();

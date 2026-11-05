@@ -22,10 +22,11 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { LANGS, translations, type Lang } from '@/i18n/translations';
-import { HERO_COLORS, HERO_FONTS, isHexColor } from '@/features/public/home/heroStyle';
+import { TEXT_COLORS, TEXT_FONTS, isHexColor } from '@/features/public/home/textStyle';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useToast } from '@/shared/ui/ToastProvider';
 import { TERMS, TERMS_KEY, serializeTerms } from '@/features/public/terms/termsContent';
+import { ContactSettingsBlock } from './ContactSettingsBlock';
 import { useContent, useContentActions, type ContentBlockRow } from '../api';
 
 // Known, human-labeled fields the site currently reads (see server/prisma/seed.ts
@@ -52,6 +53,12 @@ const KNOWN_FIELDS: { key: string; labelKey: string; multiline?: boolean; rows?:
   })),
 ];
 const KNOWN_KEYS = new Set(KNOWN_FIELDS.map((f) => f.key));
+// Fields that can have a font / colour override (so far only the hero, text on top of a photo).
+const STYLED = new Set(['hero.headline', 'hero.subheadline']);
+
+// Text fields prefilled with the text the site currently shows (instead of starting empty).
+const PREFILLED = new Set([...STYLED, 'about.title', 'about.body']);
+
 // Long groups start collapsed so the page stays short.
 const COLLAPSIBLE = new Set(['terms']);
 
@@ -122,7 +129,7 @@ export function ContentPage() {
           byKey.get(f.key) ||
             (f.key === TERMS_KEY
               ? serializeTerms(TERMS[locale])
-              : f.key === 'hero.headline' || f.key === 'hero.subheadline'
+              : PREFILLED.has(f.key)
                 ? (translations[locale][f.key] ?? '')
                 : ''),
         ]),
@@ -252,7 +259,7 @@ export function ContentPage() {
                               slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}
                             >
                               <MenuItem value="">{t('admin.content.style.default')}</MenuItem>
-                              {HERO_FONTS.map((o) => (
+                              {TEXT_FONTS.map((o) => (
                                 <MenuItem key={o.key} value={o.key} sx={{ fontFamily: o.css }}>
                                   {o.label}
                                 </MenuItem>
@@ -262,7 +269,7 @@ export function ContentPage() {
                               <Typography variant="body2" color="text.secondary">
                                 {t('admin.content.style.color')}
                               </Typography>
-                              {HERO_COLORS.map((c) => (
+                              {TEXT_COLORS.map((c) => (
                                 <Tooltip key={c.value} title={c.label}>
                                   <Box
                                     component="button"
@@ -349,6 +356,7 @@ export function ContentPage() {
                       head
                     )}
                     {collapsible ? <Collapse in={expanded}>{fields}</Collapse> : fields}
+                    {group === 'contact' && <ContactSettingsBlock />}
                   </Paper>
                 );
               })}

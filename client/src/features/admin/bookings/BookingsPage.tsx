@@ -23,6 +23,7 @@ import type { Booking, BookingStatus } from '@/shared/types';
 import { usePrice } from '@/shared/usePrice';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useToast } from '@/shared/ui/ToastProvider';
+import { isConflictError } from '../errors';
 import { useBookings, useBookingActions, type BookingPeriod } from '../api';
 import { NewBookingButton } from './NewBookingButton';
 import { BookingDetailsDrawer } from './BookingDetailsDrawer';
@@ -88,7 +89,7 @@ export function BookingsPage() {
   const onActionError = (err: unknown) =>
     toast.error(
       t(
-        (err as { response?: { status?: number } })?.response?.status === 409
+        isConflictError(err)
           ? 'admin.bookings.actionConflict'
           : 'admin.bookings.actionError',
       ),

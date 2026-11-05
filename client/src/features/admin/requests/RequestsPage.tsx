@@ -14,16 +14,20 @@ import { api } from '@/shared/api/client';
 import type { Booking } from '@/shared/types';
 import { usePrice } from '@/shared/usePrice';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { useToast } from '@/shared/ui/ToastProvider';
+import { isConflictError } from '../errors';
 
 export function RequestsPage() {
   const { t } = useLanguage();
   const price = usePrice();
   const fmtDate = useFormatDate();
   const qc = useQueryClient();
+  const toast = useToast();
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'bookings', 'PENDING'],
     queryFn: async () =>
       (await api.get<Booking[]>('/admin/bookings', { params: { status: 'PENDING' } })).data,
+    refetchInterval: 60_000,
   });
 
   const act = useMutation({
@@ -33,6 +37,11 @@ export function RequestsPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin', 'bookings'] });
+    },
+    // e.g. confirming dates that another confirmed stay or a block already took (409 CONFLICT)
+    onError: (err) => {
+      toast.error(t(isConflictError(err) ? 'admin.bookings.actionConflict' : 'admin.bookings.actionError'));
+      qc.invalidateQueries({ queryKey: ['admin', 'bookings'] }); // the list may be stale
     },
   });
 

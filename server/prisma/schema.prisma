@@ -236,6 +236,7 @@ model SiteSettings {
   lng                  Float?
   mapEmbed             String?
   notificationEmail    String   @default("")
+  notifyToSiteEmail    Boolean  @default(false) // send booking notifications to the public site email instead
   notificationChannels String   @default("{}") // JSON string
   socialLinks          String   @default("{}") // JSON string
   currency             String   @default("UAH")

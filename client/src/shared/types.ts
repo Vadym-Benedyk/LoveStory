@@ -108,6 +108,7 @@ export interface AdminSettings {
   mapEmbed: string;
   mapEmbedValid?: boolean; // server-computed; read-only
   notificationEmail: string;
+  notifyToSiteEmail: boolean;
   socialLinks: SocialLinks;
 }
 
