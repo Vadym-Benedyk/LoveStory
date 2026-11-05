@@ -1,4 +1,4 @@
-import { useFormatDate } from '@/i18n/DateLocaleProvider';
+import { useFormatDate, useFormatDateTime } from '@/i18n/DateLocaleProvider';
 import {
   Box,
   Button,
@@ -21,6 +21,7 @@ export function RequestsPage() {
   const { t } = useLanguage();
   const price = usePrice();
   const fmtDate = useFormatDate();
+  const fmtDateTime = useFormatDateTime();
   const qc = useQueryClient();
   const toast = useToast();
   const { data, isLoading } = useQuery({
@@ -63,6 +64,9 @@ export function RequestsPage() {
                 <Typography variant="h6">{b.guestName}</Typography>
                 <Chip label={b.reference} size="small" />
               </Stack>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                {t('admin.requests.submitted', { when: fmtDateTime(b.createdAt) })}
+              </Typography>
               <Typography variant="body2" color="text.secondary">
                 {t('admin.requests.datesGuests', {
                   checkIn: fmtDate(b.checkIn),

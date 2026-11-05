@@ -40,6 +40,17 @@ export function formatDate(value: string | dayjs.Dayjs, lang: Lang): string {
   return d.locale(lang).format(lang === 'uk' ? 'DD.MM.YYYY' : 'MMM D, YYYY');
 }
 
+// Moment something happened (a real timestamp, unlike stay dates), shown in the viewer's own
+// timezone: "05.11.2026, 14:32" (UA) / "Nov 5, 2026, 2:32 PM" (EN).
+export function formatDateTime(value: string, lang: Lang): string {
+  return dayjs(value).locale(lang).format(lang === 'uk' ? 'DD.MM.YYYY, HH:mm' : 'MMM D, YYYY, h:mm A');
+}
+
+export function useFormatDateTime() {
+  const { lang } = useLanguage();
+  return useCallback((value: string) => formatDateTime(value, lang), [lang]);
+}
+
 export function useFormatDate() {
   const { lang } = useLanguage();
   return useCallback((value: string | dayjs.Dayjs) => formatDate(value, lang), [lang]);

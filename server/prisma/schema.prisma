@@ -94,12 +94,13 @@ model PriceRule {
   id               String    @id @default(cuid())
   name             String // Ukrainian (default site language)
   nameEn           String    @default("") // English
-  kind             String // BASE | WEEKEND | SEASONAL
+  kind             String // BASE | WEEKEND | SEASONAL | DATES
   nightlyRateMinor Int
   currency         String    @default("UAH")
   appliesFrom      DateTime? // SEASONAL only
   appliesTo        DateTime? // SEASONAL only
   daysOfWeek       String    @default("") // WEEKEND: CSV of weekday numbers, e.g. "5,6" (Fri,Sat)
+  dates            String    @default("") // DATES: CSV of YYYY-MM-DD; applies to the night starting that date
   minNights        Int?
   priority         Int       @default(0) // higher wins on overlap
   isActive         Boolean   @default(true)

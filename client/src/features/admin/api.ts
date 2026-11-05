@@ -271,7 +271,7 @@ export function useMediaActions() {
 }
 
 // ---- Pricing (rules + add-ons) ----
-export type PriceRuleKind = 'BASE' | 'WEEKEND' | 'SEASONAL';
+export type PriceRuleKind = 'BASE' | 'WEEKEND' | 'SEASONAL' | 'DATES';
 export type AddonUnit = 'PER_STAY' | 'PER_NIGHT' | 'PER_PERSON';
 
 export interface PriceRule {
@@ -284,6 +284,7 @@ export interface PriceRule {
   appliesFrom?: string | null;
   appliesTo?: string | null;
   daysOfWeek: string;
+  dates?: string; // DATES: CSV of YYYY-MM-DD
   minNights?: number | null;
   priority: number;
   isActive: boolean;

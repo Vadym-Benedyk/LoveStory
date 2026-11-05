@@ -86,6 +86,10 @@ export const en: Record<string, string> = {
   'admin.settings.notifySameTo': 'New booking emails will be sent to {email} (the email from “Contacts on the site”).',
   'admin.settings.notifySameEmpty': 'No site email is set — emails go to the server’s default address (if configured). Add an email under “Contacts on the site”.',
   'admin.settings.phoneInvalid': 'Enter the full number: +380 (XX) XXX-XX-XX.',
+  'admin.pricing.kind.dates': 'Specific dates',
+  'admin.pricing.addDate': 'Add a date',
+  'admin.pricing.datesHint': 'The rate applies to the night that starts on each of these dates (check-in on that day). Add as many as you need: Christmas, Easter, etc.',
+  'admin.pricing.noDates': 'No dates added yet.',
   'footer.follow': 'Follow us',
   'footer.rights': 'All rights reserved.',
   // booking
@@ -172,6 +176,7 @@ export const en: Record<string, string> = {
   'admin.requests.datesGuests': '{checkIn} → {checkOut} · {count} guests',
   'admin.guests.overCapacity': 'over capacity ({capacity})',
   'admin.requests.quote': 'Quote: {amount}',
+  'admin.requests.submitted': 'Request submitted: {when}',
   'admin.requests.decline': 'Decline',
   'admin.requests.confirmAndBlock': 'Confirm & block dates',
 

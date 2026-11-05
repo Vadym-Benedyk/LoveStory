@@ -45,6 +45,12 @@ function resolveNightRule(date: Date, rules: PriceRule[]): PriceRule | undefined
         if (!r.appliesFrom || !r.appliesTo) return false;
         return toDateOnly(date) >= toDateOnly(r.appliesFrom) && toDateOnly(date) < toDateOnly(r.appliesTo);
       }
+      if (r.kind === 'DATES') {
+        // Specific dates (holidays etc.): the rule covers the night that starts on each listed date.
+        return String(r.dates ?? '')
+          .split(',')
+          .includes(date.toISOString().slice(0, 10));
+      }
       if (r.kind === 'WEEKEND') {
         // String() handles the SQLite CSV ("5,6") and is defensive across schema versions.
         const days = parseDays(String(r.daysOfWeek));

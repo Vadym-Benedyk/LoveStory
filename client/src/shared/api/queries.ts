@@ -17,12 +17,13 @@ export interface PublicRule {
   id: string;
   name: string;
   nameEn: string;
-  kind: 'BASE' | 'WEEKEND' | 'SEASONAL';
+  kind: 'BASE' | 'WEEKEND' | 'SEASONAL' | 'DATES';
   nightlyRateMinor: number;
   currency: string;
   appliesFrom?: string | null;
   appliesTo?: string | null;
   daysOfWeek: string;
+  dates?: string;
   minNights?: number | null;
   priority: number;
 }

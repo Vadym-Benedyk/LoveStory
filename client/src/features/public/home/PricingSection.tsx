@@ -36,9 +36,9 @@ export function PricingSection() {
   const { data: content } = useSiteContent();
 
   // Base rate first, then weekend, then seasonal (the API orders by priority, which is for pricing).
-  const KIND_ORDER = { BASE: 0, WEEKEND: 1, SEASONAL: 2 } as const;
+  const KIND_ORDER = { BASE: 0, WEEKEND: 1, SEASONAL: 2, DATES: 3 } as const;
   const rules = [...(pricing?.rules ?? [])].sort(
-    (a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || (a.appliesFrom ?? '').localeCompare(b.appliesFrom ?? ''),
+    (a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || (a.appliesFrom ?? a.dates ?? '').localeCompare(b.appliesFrom ?? b.dates ?? ''),
   );
   const addons = pricing?.addons ?? [];
   const included = pricing?.included ?? [];
@@ -48,6 +48,10 @@ export function PricingSection() {
     if (r.kind === 'WEEKEND') {
       const days = r.daysOfWeek.split(',').filter(Boolean).map(Number);
       return days.length ? days.map((d) => t(`admin.pricing.day.${DAY_KEYS[d]}`)).join(', ') : '—';
+    }
+    if (r.kind === 'DATES') {
+      const list = (r.dates ?? '').split(',').filter(Boolean).sort();
+      return list.length ? list.map((d) => fmtDate(d)).join(', ') : '—';
     }
     if (r.kind === 'SEASONAL') {
       return r.appliesFrom && r.appliesTo ? `${fmtDate(r.appliesFrom)} – ${fmtDate(r.appliesTo)}` : '—';

@@ -54,6 +54,7 @@ const includedItems: { name: string; nameEn: string; icon: string }[] = [
   { name: 'Риболовля', nameEn: 'Fishing', icon: 'fishing' },
   { name: 'Парковка', nameEn: 'Parking', icon: 'parking' },
   { name: 'Інтернет', nameEn: 'Internet', icon: 'wifi' },
+  { name: 'Мангал', nameEn: 'BBQ grill', icon: 'grill' },
 ];
 
 async function main() {
@@ -124,8 +125,7 @@ async function main() {
     await prisma.addon.createMany({
       data: [
         { name: 'Теплий чан', nameEn: 'Hot tub', priceMinor: 500000, unit: 'PER_STAY', sortOrder: 1, currency: CURRENCY },
-        { name: 'Мангал', nameEn: 'BBQ grill', priceMinor: 0, unit: 'PER_STAY', sortOrder: 2, currency: CURRENCY },
-        { name: 'Дрова (в’язка)', nameEn: 'Firewood bundle', priceMinor: 30000, unit: 'PER_STAY', sortOrder: 3, currency: CURRENCY },
+        { name: 'Дрова (в’язка)', nameEn: 'Firewood bundle', priceMinor: 30000, unit: 'PER_STAY', sortOrder: 2, currency: CURRENCY },
       ],
     });
   }

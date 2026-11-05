@@ -87,6 +87,10 @@ export const uk: Record<string, string> = {
   'admin.settings.notifySameTo': 'Листи про нові заявки надходитимуть на {email} (email із розділу «Контакти на сайті»).',
   'admin.settings.notifySameEmpty': 'Email на сайті не вказано — листи підуть на адресу з конфігурації сервера (якщо вона задана). Вкажіть email у розділі «Контакти на сайті».',
   'admin.settings.phoneInvalid': 'Введіть номер повністю: +380 (XX) XXX-XX-XX.',
+  'admin.pricing.kind.dates': 'Окремі дати',
+  'admin.pricing.addDate': 'Додати дату',
+  'admin.pricing.datesHint': 'Тариф діє на ніч, що починається в кожну з цих дат (заселення в цей день). Додайте скільки потрібно: Різдво, Великдень тощо.',
+  'admin.pricing.noDates': 'Дати ще не додано.',
   'footer.follow': 'Слідкуйте за нами',
   'footer.rights': 'Усі права захищені.',
   'footer.producedBy': 'Створено',
@@ -177,6 +181,7 @@ export const uk: Record<string, string> = {
   'admin.requests.datesGuests': '{checkIn} → {checkOut} · гостей: {count}',
   'admin.guests.overCapacity': 'більше за місткість ({capacity})',
   'admin.requests.quote': 'Сума: {amount}',
+  'admin.requests.submitted': 'Заявку сформовано: {when}',
   'admin.requests.decline': 'Відхилити',
   'admin.requests.confirmAndBlock': 'Підтвердити та забронювати дати',
 

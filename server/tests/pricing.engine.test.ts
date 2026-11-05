@@ -12,6 +12,7 @@ const rule = (over: Partial<PriceRule>): PriceRule => ({
   appliesFrom: null,
   appliesTo: null,
   daysOfWeek: '',
+  dates: '',
   minNights: null,
   priority: 0,
   isActive: true,
@@ -73,5 +74,41 @@ describe('pricing engine', () => {
     });
     expect(q.discountMinor).toBe(2000);
     expect(q.totalMinor).toBe(18000);
+  });
+
+  describe('specific dates (DATES rule)', () => {
+    const withDates = [
+      ...rules,
+      rule({ name: 'Christmas', kind: 'DATES', dates: '2026-12-25,2026-12-26,2027-04-04', nightlyRateMinor: 30000, priority: 20 }),
+    ];
+    const night = (checkIn: string, checkOut: string) =>
+      buildQuote({ checkIn: new Date(checkIn), checkOut: new Date(checkOut), rules: withDates, currency: 'UAH' }).nightly.map(
+        (n) => [n.date, n.rateMinor],
+      );
+
+    it('applies only to the listed dates, not to the days between or around them', () => {
+      // Wed 23, Thu 24, Fri 25, Sat 26, Sun 27 → 25th and 26th use the DATES rate
+      expect(night('2026-12-23', '2026-12-28')).toEqual([
+        ['2026-12-23', 10000],
+        ['2026-12-24', 10000],
+        ['2026-12-25', 30000],
+        ['2026-12-26', 30000],
+        ['2026-12-27', 10000],
+      ]);
+    });
+
+    it('beats the weekend rate by priority, and works for a single night and a non-contiguous list', () => {
+      expect(night('2027-04-04', '2027-04-05')).toEqual([['2027-04-04', 30000]]); // a Sunday
+      expect(night('2026-12-25', '2026-12-26')).toEqual([['2026-12-25', 30000]]); // a Friday: DATES > WEEKEND
+    });
+
+    it('is ignored when inactive or when the list is empty', () => {
+      const off = [...rules, rule({ kind: 'DATES', dates: '2026-12-25', isActive: false, nightlyRateMinor: 30000, priority: 20 })];
+      const empty = [...rules, rule({ kind: 'DATES', dates: '', nightlyRateMinor: 30000, priority: 20 })];
+      for (const rs of [off, empty]) {
+        const q = buildQuote({ checkIn: new Date('2026-12-25'), checkOut: new Date('2026-12-26'), rules: rs, currency: 'UAH' });
+        expect(q.nightly[0]!.rateMinor).toBe(15000); // plain Friday weekend rate
+      }
+    });
   });
 });

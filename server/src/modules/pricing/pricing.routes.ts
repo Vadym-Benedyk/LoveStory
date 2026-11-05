@@ -6,11 +6,16 @@ import { requireAuth, requireRole } from '../../middleware/auth.js';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 
-const RULE_KINDS = ['BASE', 'WEEKEND', 'SEASONAL'] as const;
+const RULE_KINDS = ['BASE', 'WEEKEND', 'SEASONAL', 'DATES'] as const;
 const ADDON_UNITS = ['PER_STAY', 'PER_NIGHT', 'PER_PERSON'] as const;
 const daysOfWeekCsv = z
   .string()
   .regex(/^$|^[0-6](,[0-6]){0,6}$/, 'Expected a comma-separated list of weekday numbers, e.g. "5,6"');
+// DATES rules: CSV of calendar dates, e.g. "2026-12-25,2026-12-26,2027-04-04" (up to 100).
+const datesCsv = z
+  .string()
+  .max(1100)
+  .regex(/^$|^\d{4}-\d{2}-\d{2}(,\d{4}-\d{2}-\d{2})*$/, 'Expected comma-separated YYYY-MM-DD dates');
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
 
 export const adminPricingRouter = Router();
@@ -40,6 +45,7 @@ const ruleObject = z.object({
   appliesFrom: dateStr.optional().nullable(),
   appliesTo: dateStr.optional().nullable(),
   daysOfWeek: daysOfWeekCsv.default(''),
+  dates: datesCsv.default(''),
   minNights: z.number().int().min(1).optional().nullable(),
   priority: z.number().int().default(0),
   isActive: z.boolean().default(true),

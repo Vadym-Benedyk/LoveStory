@@ -90,3 +90,32 @@ describe('public /pricing', () => {
     expect(pub.addons[0].priceMinor).toBe(0);
   });
 });
+
+describe('DATES tariffs', () => {
+  const base = { name: 'Різдво', nameEn: 'Christmas', kind: 'DATES', nightlyRateMinor: 300000 };
+
+  it('stores a list of dates, rejects malformed lists, and exposes them publicly', async () => {
+    const ok = await post('/rules', { ...base, dates: '2026-12-25,2026-12-26' });
+    expect(ok.status).toBe(201);
+    expect(ok.body).toMatchObject({ kind: 'DATES', dates: '2026-12-25,2026-12-26' });
+
+    for (const bad of ['25.12.2026', '2026-12-25,', '2026-12-25;2026-12-26', 'x']) {
+      expect((await post('/rules', { ...base, dates: bad })).status).toBe(400);
+    }
+
+    const upd = await call(srv, 'PATCH', `/admin/pricing/rules/${ok.body.id}`, { token: owner, body: { dates: '2027-04-04' } });
+    expect(upd.body.dates).toBe('2027-04-04');
+    const pub = (await call(srv, 'GET', '/pricing')).body.rules.find((r: { kind: string }) => r.kind === 'DATES');
+    expect(pub.dates).toBe('2027-04-04');
+  });
+
+  it('is used by the live quote for the listed night only', async () => {
+    const { day } = await import('./helpers.js');
+    await post('/rules', { ...base, dates: day(10), priority: 50 });
+    const q = (a: number, b: number) =>
+      call(srv, 'POST', '/quote', { body: { checkIn: day(a), checkOut: day(b), guestsCount: 2 } });
+    expect((await q(10, 11)).body.accommodationMinor).toBe(300000); // the holiday night
+    expect((await q(11, 12)).body.accommodationMinor).toBe(10000); // the next night: base rate
+  });
+});
+

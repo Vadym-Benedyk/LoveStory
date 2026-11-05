@@ -2,6 +2,7 @@ import { useFormatDate } from '@/i18n/DateLocaleProvider';
 import { useState } from 'react';
 import {
   Box,
+  Chip,
   Button,
   Dialog,
   DialogActions,
@@ -41,7 +42,9 @@ import {
   type PricingAddon,
 } from '../api';
 
-const KINDS: PriceRuleKind[] = ['BASE', 'WEEKEND', 'SEASONAL'];
+const KINDS: PriceRuleKind[] = ['BASE', 'WEEKEND', 'SEASONAL', 'DATES'];
+
+const splitDates = (csv?: string) => (csv ? csv.split(',').filter(Boolean) : []);
 const UNITS: AddonUnit[] = ['PER_STAY', 'PER_NIGHT', 'PER_PERSON'];
 // Index matches JS Date#getDay() (0 = Sunday … 6 = Saturday), which is what daysOfWeek stores.
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -54,6 +57,7 @@ interface RuleForm {
   daysOfWeek: number[];
   appliesFrom: Dayjs | null;
   appliesTo: Dayjs | null;
+  dates: string[]; // DATES: YYYY-MM-DD, sorted
   minNights: string;
   priority: string;
   isActive: boolean;
@@ -67,6 +71,7 @@ const emptyRuleForm: RuleForm = {
   daysOfWeek: [],
   appliesFrom: null,
   appliesTo: null,
+  dates: [],
   minNights: '',
   priority: '0',
   isActive: true,
@@ -113,14 +118,18 @@ export function PricingPage() {
 
   const [ruleDialogId, setRuleDialogId] = useState<string | null | undefined>(undefined);
   const [ruleForm, setRuleForm] = useState<RuleForm>(emptyRuleForm);
+  const [pickedDate, setPickedDate] = useState<Dayjs | null>(null);
+  const [pickerKey, setPickerKey] = useState(0); // remounting the picker clears its text after a date is added
   const [addonDialogId, setAddonDialogId] = useState<string | null | undefined>(undefined);
   const [addonForm, setAddonForm] = useState<AddonForm>(emptyAddonForm);
 
   const openNewRule = () => {
+    setPickedDate(null);
     setRuleForm(emptyRuleForm);
     setRuleDialogId(null);
   };
   const openEditRule = (r: PriceRule) => {
+    setPickedDate(null);
     setRuleForm({
       name: r.name,
       nameEn: r.nameEn ?? '',
@@ -129,6 +138,7 @@ export function PricingPage() {
       daysOfWeek: r.daysOfWeek ? r.daysOfWeek.split(',').filter(Boolean).map(Number) : [],
       appliesFrom: r.appliesFrom ? dayjs(r.appliesFrom) : null,
       appliesTo: r.appliesTo ? dayjs(r.appliesTo) : null,
+      dates: splitDates(r.dates).sort(),
       minNights: r.minNights != null ? String(r.minNights) : '',
       priority: String(r.priority),
       isActive: r.isActive,
@@ -144,6 +154,7 @@ export function PricingPage() {
       kind: ruleForm.kind,
       nightlyRateMinor: Math.round(parseFloat(ruleForm.rate || '0') * 100),
       daysOfWeek: ruleForm.kind === 'WEEKEND' ? ruleForm.daysOfWeek.slice().sort().join(',') : '',
+      dates: ruleForm.kind === 'DATES' ? ruleForm.dates.slice().sort().join(',') : '',
       appliesFrom:
         ruleForm.kind === 'SEASONAL' && ruleForm.appliesFrom
           ? ruleForm.appliesFrom.format('YYYY-MM-DD')
@@ -225,6 +236,12 @@ export function PricingPage() {
       return days.length
         ? days.map((d) => t(`admin.pricing.day.${DAY_KEYS[d]}`)).join(', ')
         : '—';
+    }
+    if (r.kind === 'DATES') {
+      const list = splitDates(r.dates).sort();
+      if (!list.length) return '—';
+      const shown = list.slice(0, 3).map((d) => fmtDate(d)).join(', ');
+      return list.length > 3 ? `${shown} +${list.length - 3}` : shown;
     }
     if (r.kind === 'SEASONAL') {
       return r.appliesFrom && r.appliesTo
@@ -453,7 +470,13 @@ export function PricingPage() {
               select
               label={t('admin.pricing.kind')}
               value={ruleForm.kind}
-              onChange={(e) => setRuleForm((f) => ({ ...f, kind: e.target.value as PriceRuleKind }))}
+              onChange={(e) =>
+                setRuleForm((f) => {
+                  const kind = e.target.value as PriceRuleKind;
+                  // Holidays should win over weekend / seasonal rates unless the owner decides otherwise.
+                  return { ...f, kind, priority: kind === 'DATES' && f.priority === '0' ? '20' : f.priority };
+                })
+              }
             >
               {KINDS.map((k) => (
                 <MenuItem key={k} value={k}>
@@ -506,6 +529,44 @@ export function PricingPage() {
                 </Stack>
             )}
 
+            {ruleForm.kind === 'DATES' && (
+              <Box>
+                <DatePicker
+                  key={pickerKey}
+                  label={t('admin.pricing.addDate')}
+                  value={pickedDate}
+                  onChange={(v) => {
+                    // Add as soon as a full, valid date is chosen / typed, then clear the picker.
+                    if (v && v.isValid()) {
+                      const iso = v.format('YYYY-MM-DD');
+                      setRuleForm((f) =>
+                        f.dates.includes(iso) ? f : { ...f, dates: [...f.dates, iso].sort() },
+                      );
+                      setPickedDate(null);
+                      setPickerKey((k) => k + 1);
+                    } else {
+                      setPickedDate(v);
+                    }
+                  }}
+                  slotProps={{ textField: { fullWidth: true, helperText: t('admin.pricing.datesHint') } }}
+                />
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" mt={1.5}>
+                  {ruleForm.dates.length === 0 && (
+                    <Typography variant="body2" color="text.secondary">
+                      {t('admin.pricing.noDates')}
+                    </Typography>
+                  )}
+                  {ruleForm.dates.map((d) => (
+                    <Chip
+                      key={d}
+                      label={fmtDate(d)}
+                      onDelete={() => setRuleForm((f) => ({ ...f, dates: f.dates.filter((x) => x !== d) }))}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
             <TextField
               label={t('admin.pricing.minNights')}
               type="number"
@@ -533,7 +594,13 @@ export function PricingPage() {
           <Button onClick={closeRuleDialog}>{t('admin.pricing.cancel')}</Button>
           <Button
             variant="contained"
-            disabled={!ruleForm.name.trim() || !ruleForm.nameEn.trim() || createRule.isPending || updateRule.isPending}
+            disabled={
+              !ruleForm.name.trim() ||
+              !ruleForm.nameEn.trim() ||
+              (ruleForm.kind === 'DATES' && ruleForm.dates.length === 0) ||
+              createRule.isPending ||
+              updateRule.isPending
+            }
             onClick={saveRule}
           >
             {t('admin.pricing.save')}
