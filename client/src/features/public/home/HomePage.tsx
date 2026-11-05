@@ -10,6 +10,7 @@ import EmailIcon from '@mui/icons-material/Email';
 import PlaceIcon from '@mui/icons-material/Place';
 import PetsIcon from '@mui/icons-material/Pets';
 import { PricingSection } from './PricingSection';
+import { heroTextStyle } from './heroStyle';
 import { useGallery, useReviews, useSiteContent } from '@/shared/api/queries';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { Lightbox } from '@/shared/ui/Lightbox';
@@ -20,6 +21,8 @@ export function HomePage() {
   const { data: reviews } = useReviews();
   const { data: gallery } = useGallery();
   const { t } = useLanguage();
+  // Text edited in the admin (Content) wins; the built-in translation is the fallback.
+  const copy = (key: string) => data?.copy?.[key] || t(key);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const photos = gallery ?? [];
   const heroPhoto = photos.find((p) => p.isHero);
@@ -47,10 +50,19 @@ export function HomePage() {
       >
         <div className={styles.heroOverlay} />
         <Container className={styles.heroInner}>
-          <Typography variant="h1" className={styles.heroTitle}>
-            {t('hero.headline')}
+          <Typography
+            variant="h1"
+            className={styles.heroTitle}
+            style={heroTextStyle(data?.copy?.['hero.headline.font'], data?.copy?.['hero.headline.color'])}
+          >
+            {copy('hero.headline')}
           </Typography>
-          <Typography className={styles.heroSub}>{t('hero.subheadline')}</Typography>
+          <Typography
+            className={styles.heroSub}
+            style={heroTextStyle(data?.copy?.['hero.subheadline.font'], data?.copy?.['hero.subheadline.color'])}
+          >
+            {copy('hero.subheadline')}
+          </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center">
             <Button size="large" variant="contained" component={RouterLink} to="/booking">
               {t('cta.checkAvailability')}
@@ -65,9 +77,9 @@ export function HomePage() {
       {/* About */}
       <Container component="section" id="about" className={styles.section}>
         <Typography variant="h2" gutterBottom>
-          {t('about.title')}
+          {copy('about.title')}
         </Typography>
-        <Typography className={styles.lead}>{t('about.body')}</Typography>
+        <Typography className={styles.lead}>{copy('about.body')}</Typography>
       </Container>
 
       {/* Gallery */}
@@ -191,7 +203,7 @@ export function HomePage() {
           <Typography variant="h2" gutterBottom>
             {t('contact.title')}
           </Typography>
-          <Typography className={styles.lead}>{t('contact.note')}</Typography>
+          <Typography className={styles.lead}>{copy('contact.note')}</Typography>
           <Grid container spacing={3} sx={{ mt: 1 }}>
             {data?.settings?.phone && (
               <Grid item xs={12} sm={6} md={4}>

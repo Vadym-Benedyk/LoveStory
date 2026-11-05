@@ -38,10 +38,12 @@
 
 .section {
   padding-block: t.$space-section;
+  scroll-margin-top: 64px; // keep the heading clear of the sticky header
 }
 
 .sectionAlt {
   padding-block: t.$space-section;
+  scroll-margin-top: 64px;
   background: t.$cream;
 }
 

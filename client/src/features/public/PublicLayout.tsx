@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppBar,
@@ -42,7 +42,8 @@ const currentYear = new Date().getFullYear();
 export function PublicLayout() {
   const navigate = useNavigate();
   // The Terms page is a plain document: no site header there.
-  const hideHeader = useLocation().pathname === '/terms';
+  const location = useLocation();
+  const hideHeader = location.pathname === '/terms';
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const { data: content } = useSiteContent();
@@ -50,6 +51,28 @@ export function PublicLayout() {
     const href = content?.settings?.socialLinks?.[n.key];
     return href ? [{ ...n, href }] : [];
   });
+
+  // Jump to #section links (also when the page is opened straight at /#pricing). Content above the
+  // target (images, prices from the API) keeps changing the layout while loading, so keep the
+  // target in place for a moment — until the user scrolls themselves.
+  useEffect(() => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    if (!id) return;
+    let active = true;
+    const stop = () => {
+      active = false;
+    };
+    const go = () => active && document.getElementById(id)?.scrollIntoView({ block: 'start' });
+    go();
+    const timers = [150, 400, 800, 1500, 2500].map((ms) => window.setTimeout(go, ms));
+    const events = ['wheel', 'touchmove', 'keydown', 'mousedown'] as const;
+    events.forEach((e) => window.addEventListener(e, stop, { once: true, passive: true }));
+    return () => {
+      stop();
+      timers.forEach(clearTimeout);
+      events.forEach((e) => window.removeEventListener(e, stop));
+    };
+  }, [location.pathname, location.hash]);
 
   const handleBrandClick = () => {
     navigate('/');

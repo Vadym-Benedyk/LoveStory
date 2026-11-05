@@ -1,21 +1,28 @@
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Box,
   Button,
+  Chip,
   Collapse,
   Divider,
   IconButton,
+  Link,
+  MenuItem,
   Paper,
   Stack,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { LANGS, type Lang } from '@/i18n/translations';
+import { LANGS, translations, type Lang } from '@/i18n/translations';
+import { HERO_COLORS, HERO_FONTS, isHexColor } from '@/features/public/home/heroStyle';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useToast } from '@/shared/ui/ToastProvider';
 import { TERMS, TERMS_KEY, serializeTerms } from '@/features/public/terms/termsContent';
@@ -24,9 +31,13 @@ import { useContent, useContentActions, type ContentBlockRow } from '../api';
 // Known, human-labeled fields the site currently reads (see server/prisma/seed.ts
 // defaultContent). Anything else stored under a different key still shows up below,
 // in the "Other fields" section, so nothing the owner has saved is ever hidden.
-const KNOWN_FIELDS: { key: string; labelKey: string; multiline?: boolean; rows?: number; helperKey?: string; group: string; groupKey: string }[] = [
+const KNOWN_FIELDS: { key: string; labelKey: string; multiline?: boolean; rows?: number; helperKey?: string; style?: 'font' | 'color'; group: string; groupKey: string }[] = [
   { key: 'hero.headline', labelKey: 'admin.content.field.heroHeadline', group: 'hero', groupKey: 'admin.content.group.hero' },
   { key: 'hero.subheadline', labelKey: 'admin.content.field.heroSubheadline', multiline: true, group: 'hero', groupKey: 'admin.content.group.hero' },
+  ...(['headline', 'subheadline'] as const).flatMap((k) => [
+    { key: `hero.${k}.font`, labelKey: 'admin.content.style.font', style: 'font' as const, group: 'hero', groupKey: 'admin.content.group.hero' },
+    { key: `hero.${k}.color`, labelKey: 'admin.content.style.color', style: 'color' as const, group: 'hero', groupKey: 'admin.content.group.hero' },
+  ]),
   { key: 'about.title', labelKey: 'admin.content.field.aboutTitle', group: 'about', groupKey: 'admin.content.group.about' },
   { key: 'about.body', labelKey: 'admin.content.field.aboutBody', multiline: true, group: 'about', groupKey: 'admin.content.group.about' },
   { key: 'contact.note', labelKey: 'admin.content.field.contactNote', multiline: true, group: 'contact', groupKey: 'admin.content.group.contact' },
@@ -43,7 +54,33 @@ const KNOWN_FIELDS: { key: string; labelKey: string; multiline?: boolean; rows?:
 const KNOWN_KEYS = new Set(KNOWN_FIELDS.map((f) => f.key));
 // Long groups start collapsed so the page stays short.
 const COLLAPSIBLE = new Set(['terms']);
-const GROUPS = [...new Set(KNOWN_FIELDS.map((f) => f.group))];
+
+// Where each group of fields appears on the public site. `anchor` jumps to the section of the page.
+// `hintKey` points to related things that are edited elsewhere in the admin.
+const PAGES: {
+  id: string;
+  titleKey: string;
+  path: string;
+  sections: { group: string; whereKey: string; anchor?: string; hintKey?: string }[];
+}[] = [
+  {
+    id: 'home',
+    titleKey: 'admin.content.page.home',
+    path: '/',
+    sections: [
+      { group: 'hero', whereKey: 'admin.content.where.hero' },
+      { group: 'about', whereKey: 'admin.content.where.about', anchor: 'about' },
+      { group: 'pricing', whereKey: 'admin.content.where.pricing', anchor: 'pricing', hintKey: 'admin.content.hint.pricing' },
+      { group: 'contact', whereKey: 'admin.content.where.contact', anchor: 'contact', hintKey: 'admin.content.hint.contact' },
+    ],
+  },
+  {
+    id: 'terms',
+    titleKey: 'admin.content.page.terms',
+    path: '/terms',
+    sections: [{ group: 'terms', whereKey: 'admin.content.where.terms' }],
+  },
+];
 
 type CustomRow = { id: string; key: string; value: string; existing: boolean };
 let customRowSeq = 0;
@@ -56,6 +93,13 @@ const newCustomRow = (key = '', value = '', existing = false): CustomRow => ({
 
 export function ContentPage() {
   const { t } = useLanguage();
+  // Text the site shows while the field is empty (built-in translation), used as a placeholder.
+  const builtIn = (key: string) => {
+    if (key === TERMS_KEY) return undefined;
+    const k = key.startsWith('pricing.terms.') ? `${key}.text` : key;
+    const v = t(k);
+    return v === k ? undefined : v;
+  };
   const toast = useToast();
   const [locale, setLocale] = useState<Lang>('uk');
   const { data, isLoading } = useContent(locale);
@@ -75,7 +119,12 @@ export function ContentPage() {
         KNOWN_FIELDS.map((f) => [
           f.key,
           // Terms start from the built-in text so the owner edits it instead of writing from scratch.
-          byKey.get(f.key) || (f.key === TERMS_KEY ? serializeTerms(TERMS[locale]) : ''),
+          byKey.get(f.key) ||
+            (f.key === TERMS_KEY
+              ? serializeTerms(TERMS[locale])
+              : f.key === 'hero.headline' || f.key === 'hero.subheadline'
+                ? (translations[locale][f.key] ?? '')
+                : ''),
         ]),
       ),
     );
@@ -156,54 +205,155 @@ export function ContentPage() {
         <Typography>{t('admin.common.loading')}</Typography>
       ) : (
         <Stack spacing={3}>
-          {GROUPS.map((group) => {
-            const groupKey = KNOWN_FIELDS.find((f) => f.group === group)!.groupKey;
-            const collapsible = COLLAPSIBLE.has(group);
-            const expanded = !collapsible || !!open[group];
-            const fields = (
-              <Stack spacing={2} mt={2}>
-                {KNOWN_FIELDS.filter((f) => f.group === group).map((f) => (
-                  <TextField
-                    key={f.key}
-                    label={t(f.labelKey)}
-                    value={values[f.key] ?? ''}
-                    onChange={(e) => setKnown(f.key, e.target.value)}
-                    multiline={f.multiline}
-                    minRows={f.multiline ? (f.rows ?? 3) : undefined}
-                    helperText={f.helperKey ? t(f.helperKey) : undefined}
-                    fullWidth
-                  />
-                ))}
+          {PAGES.map((page) => (
+            <Stack key={page.id} spacing={2}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                <Typography variant="h5">{t(page.titleKey)}</Typography>
+                <Button
+                  size="small"
+                  component="a"
+                  href={page.path}
+                  target="_blank"
+                  rel="noopener"
+                  endIcon={<OpenInNewIcon fontSize="small" />}
+                >
+                  {t('admin.content.openPage')}
+                </Button>
               </Stack>
-            );
-            return (
-              <Paper key={group} elevation={0} sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}>
-                {collapsible ? (
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    alignItems="center"
-                    onClick={() => setOpen((o) => ({ ...o, [group]: !expanded }))}
-                    sx={{ cursor: 'pointer' }}
-                  >
-                    <Typography variant="h6">{t(groupKey)}</Typography>
-                    <IconButton
-                      aria-expanded={expanded}
-                      aria-label={t(groupKey)}
-                      sx={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}
-                    >
-                      <ExpandMoreIcon />
-                    </IconButton>
+
+              {page.sections.map((sec) => {
+                const group = sec.group;
+                const groupKey = KNOWN_FIELDS.find((f) => f.group === group)!.groupKey;
+                const collapsible = COLLAPSIBLE.has(group);
+                const expanded = !collapsible || !!open[group];
+                const fields = (
+                  <Stack spacing={2} mt={2}>
+                    {KNOWN_FIELDS.filter((f) => f.group === group && !f.style).map((f) => (
+                      <Stack key={f.key} spacing={1}>
+                        <TextField
+                          label={t(f.labelKey)}
+                          value={values[f.key] ?? ''}
+                          onChange={(e) => setKnown(f.key, e.target.value)}
+                          multiline={f.multiline}
+                          minRows={f.multiline ? (f.rows ?? 3) : undefined}
+                          helperText={f.helperKey ? t(f.helperKey) : undefined}
+                          placeholder={builtIn(f.key)}
+                          fullWidth
+                        />
+                        {KNOWN_FIELDS.some((x) => x.key === `${f.key}.font`) && (
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
+                            <TextField
+                              select
+                              size="small"
+                              label={t('admin.content.style.font')}
+                              value={values[`${f.key}.font`] ?? ''}
+                              onChange={(e) => setKnown(`${f.key}.font`, e.target.value)}
+                              sx={{ minWidth: 220 }}
+                              slotProps={{ inputLabel: { shrink: true }, select: { displayEmpty: true } }}
+                            >
+                              <MenuItem value="">{t('admin.content.style.default')}</MenuItem>
+                              {HERO_FONTS.map((o) => (
+                                <MenuItem key={o.key} value={o.key} sx={{ fontFamily: o.css }}>
+                                  {o.label}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                              <Typography variant="body2" color="text.secondary">
+                                {t('admin.content.style.color')}
+                              </Typography>
+                              {HERO_COLORS.map((c) => (
+                                <Tooltip key={c.value} title={c.label}>
+                                  <Box
+                                    component="button"
+                                    type="button"
+                                    aria-label={c.label}
+                                    onClick={() => setKnown(`${f.key}.color`, c.value)}
+                                    sx={{
+                                      width: 26,
+                                      height: 26,
+                                      borderRadius: '50%',
+                                      bgcolor: c.value,
+                                      cursor: 'pointer',
+                                      border: '2px solid',
+                                      borderColor:
+                                        (values[`${f.key}.color`] ?? '').toLowerCase() === c.value
+                                          ? 'primary.main'
+                                          : 'divider',
+                                    }}
+                                  />
+                                </Tooltip>
+                              ))}
+                              <input
+                                type="color"
+                                aria-label={t('admin.content.style.color')}
+                                value={isHexColor(values[`${f.key}.color`] ?? '') ? values[`${f.key}.color`] : '#fbf8f1'}
+                                onChange={(e) => setKnown(`${f.key}.color`, e.target.value)}
+                                style={{ width: 34, height: 30, padding: 0, border: 0, background: 'none', cursor: 'pointer' }}
+                              />
+                              <Button
+                                size="small"
+                                disabled={!values[`${f.key}.font`] && !values[`${f.key}.color`]}
+                                onClick={() => {
+                                  setKnown(`${f.key}.font`, '');
+                                  setKnown(`${f.key}.color`, '');
+                                }}
+                              >
+                                {t('admin.content.style.reset')}
+                              </Button>
+                            </Stack>
+                          </Stack>
+                        )}
+                      </Stack>
+                    ))}
                   </Stack>
-                ) : (
-                  <Typography variant="h6" gutterBottom>
-                    {t(groupKey)}
-                  </Typography>
-                )}
-                {collapsible ? <Collapse in={expanded}>{fields}</Collapse> : fields}
-              </Paper>
-            );
-          })}
+                );
+                const head = (
+                  <>
+                    <Typography variant="h6">{t(groupKey)}</Typography>
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap mt={0.5}>
+                      <Chip size="small" variant="outlined" label={t(sec.whereKey)} />
+                      {sec.anchor && (
+                        <Link href={`${page.path}#${sec.anchor}`} target="_blank" rel="noopener" variant="body2">
+                          {t('admin.content.openSection')}
+                        </Link>
+                      )}
+                    </Stack>
+                    {sec.hintKey && (
+                      <Typography variant="body2" color="text.secondary" mt={1}>
+                        {t(sec.hintKey)}
+                      </Typography>
+                    )}
+                  </>
+                );
+                return (
+                  <Paper key={group} elevation={0} sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}>
+                    {collapsible ? (
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="flex-start"
+                        onClick={() => setOpen((o) => ({ ...o, [group]: !expanded }))}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        <div>{head}</div>
+                        <IconButton
+                          aria-expanded={expanded}
+                          aria-label={t(groupKey)}
+                          sx={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}
+                        >
+                          <ExpandMoreIcon />
+                        </IconButton>
+                      </Stack>
+                    ) : (
+                      head
+                    )}
+                    {collapsible ? <Collapse in={expanded}>{fields}</Collapse> : fields}
+                  </Paper>
+                );
+              })}
+            </Stack>
+          ))}
 
           <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
