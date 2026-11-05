@@ -29,12 +29,14 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
 import { usePrice } from '@/shared/usePrice';
+import { includedIcon, INCLUDED_ICONS, localizedName } from '@/shared/ui/includedIcons';
 import { useLanguage } from '@/i18n/LanguageContext';
 import {
   usePricing,
   usePricingActions,
   type AddonUnit,
   type PriceRule,
+  type IncludedItem,
   type PriceRuleKind,
   type PricingAddon,
 } from '../api';
@@ -46,6 +48,7 @@ const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
 interface RuleForm {
   name: string;
+  nameEn: string;
   kind: PriceRuleKind;
   rate: string;
   daysOfWeek: number[];
@@ -58,6 +61,7 @@ interface RuleForm {
 
 const emptyRuleForm: RuleForm = {
   name: '',
+  nameEn: '',
   kind: 'SEASONAL',
   rate: '',
   daysOfWeek: [],
@@ -70,7 +74,9 @@ const emptyRuleForm: RuleForm = {
 
 interface AddonForm {
   name: string;
+  nameEn: string;
   description: string;
+  descriptionEn: string;
   price: string;
   unit: AddonUnit;
   isActive: boolean;
@@ -78,17 +84,28 @@ interface AddonForm {
 
 const emptyAddonForm: AddonForm = {
   name: '',
+  nameEn: '',
   description: '',
+  descriptionEn: '',
   price: '',
   unit: 'PER_STAY',
   isActive: true,
 };
 
 export function PricingPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { data, isLoading } = usePricing();
-  const { createRule, updateRule, removeRule, createAddon, updateAddon, removeAddon } =
-    usePricingActions();
+  const {
+    createRule,
+    updateRule,
+    removeRule,
+    createAddon,
+    updateAddon,
+    removeAddon,
+    createIncluded,
+    updateIncluded,
+    removeIncluded,
+  } = usePricingActions();
 
   const price = usePrice();
   const fmtDate = useFormatDate();
@@ -106,6 +123,7 @@ export function PricingPage() {
   const openEditRule = (r: PriceRule) => {
     setRuleForm({
       name: r.name,
+      nameEn: r.nameEn ?? '',
       kind: r.kind,
       rate: String(r.nightlyRateMinor / 100),
       daysOfWeek: r.daysOfWeek ? r.daysOfWeek.split(',').filter(Boolean).map(Number) : [],
@@ -122,6 +140,7 @@ export function PricingPage() {
   const saveRule = () => {
     const payload: Partial<PriceRule> = {
       name: ruleForm.name.trim(),
+      nameEn: ruleForm.nameEn.trim(),
       kind: ruleForm.kind,
       nightlyRateMinor: Math.round(parseFloat(ruleForm.rate || '0') * 100),
       daysOfWeek: ruleForm.kind === 'WEEKEND' ? ruleForm.daysOfWeek.slice().sort().join(',') : '',
@@ -151,7 +170,9 @@ export function PricingPage() {
   const openEditAddon = (a: PricingAddon) => {
     setAddonForm({
       name: a.name,
+      nameEn: a.nameEn ?? '',
       description: a.description ?? '',
+      descriptionEn: a.descriptionEn ?? '',
       price: String(a.priceMinor / 100),
       unit: a.unit,
       isActive: a.isActive,
@@ -163,7 +184,9 @@ export function PricingPage() {
   const saveAddon = () => {
     const payload: Partial<PricingAddon> = {
       name: addonForm.name.trim(),
+      nameEn: addonForm.nameEn.trim(),
       description: addonForm.description.trim() || null,
+      descriptionEn: addonForm.descriptionEn.trim() || null,
       priceMinor: Math.round(parseFloat(addonForm.price || '0') * 100),
       unit: addonForm.unit,
       isActive: addonForm.isActive,
@@ -172,6 +195,27 @@ export function PricingPage() {
       updateAddon.mutate({ id: addonDialogId, patch: payload }, { onSuccess: closeAddonDialog });
     } else {
       createAddon.mutate(payload, { onSuccess: closeAddonDialog });
+    }
+  };
+
+  // "What's included" items
+  const [includedDialogId, setIncludedDialogId] = useState<string | null | undefined>(undefined);
+  const [includedForm, setIncludedForm] = useState({ name: '', nameEn: '', icon: 'check', isActive: true });
+  const openNewIncluded = () => {
+    setIncludedForm({ name: '', nameEn: '', icon: 'check', isActive: true });
+    setIncludedDialogId(null);
+  };
+  const openEditIncluded = (i: IncludedItem) => {
+    setIncludedForm({ name: i.name, nameEn: i.nameEn ?? '', icon: i.icon, isActive: i.isActive });
+    setIncludedDialogId(i.id);
+  };
+  const closeIncludedDialog = () => setIncludedDialogId(undefined);
+  const saveIncluded = () => {
+    const payload = { ...includedForm, name: includedForm.name.trim(), nameEn: includedForm.nameEn.trim() };
+    if (includedDialogId) {
+      updateIncluded.mutate({ id: includedDialogId, patch: payload }, { onSuccess: closeIncludedDialog });
+    } else {
+      createIncluded.mutate(payload, { onSuccess: closeIncludedDialog });
     }
   };
 
@@ -227,7 +271,7 @@ export function PricingPage() {
                   <TableBody>
                     {data?.rules.map((r) => (
                       <TableRow key={r.id} hover>
-                        <TableCell>{r.name}</TableCell>
+                        <TableCell>{localizedName(r, lang)}</TableCell>
                         <TableCell>{t(`admin.pricing.kind.${r.kind.toLowerCase()}`)}</TableCell>
                         <TableCell>{price.format(r.nightlyRateMinor)}</TableCell>
                         <TableCell>{ruleDetails(r)}</TableCell>
@@ -289,7 +333,7 @@ export function PricingPage() {
                   <TableBody>
                     {data?.addons.map((a) => (
                       <TableRow key={a.id} hover>
-                        <TableCell>{a.name}</TableCell>
+                        <TableCell>{localizedName(a, lang)}</TableCell>
                         <TableCell>{price.format(a.priceMinor)}</TableCell>
                         <TableCell>{t(`admin.pricing.unit.${toCamel(a.unit)}`)}</TableCell>
                         <TableCell>
@@ -323,6 +367,67 @@ export function PricingPage() {
               </TableContainer>
             )}
           </Box>
+
+          {/* What's included in the price */}
+          <Box>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
+              <Typography variant="h6">{t('admin.pricing.includedTitle')}</Typography>
+              <Button size="small" startIcon={<AddIcon />} onClick={openNewIncluded}>
+                {t('admin.pricing.addIncluded')}
+              </Button>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" mb={1.5}>
+              {t('admin.pricing.includedHint')}
+            </Typography>
+            {(data?.included.length ?? 0) === 0 ? (
+              <Typography color="text.secondary">{t('admin.pricing.includedEmpty')}</Typography>
+            ) : (
+              <TableContainer component={Paper} elevation={0}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell />
+                      <TableCell>{t('admin.pricing.col.name')}</TableCell>
+                      <TableCell>{t('admin.pricing.col.status')}</TableCell>
+                      <TableCell align="right">{t('admin.pricing.col.actions')}</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {data?.included.map((i) => (
+                      <TableRow key={i.id} hover>
+                        <TableCell sx={{ width: 48, color: 'primary.main' }}>{includedIcon(i.icon)}</TableCell>
+                        <TableCell>{localizedName(i, lang)}</TableCell>
+                        <TableCell>
+                          <Switch
+                            size="small"
+                            checked={i.isActive}
+                            onChange={(e) =>
+                              updateIncluded.mutate({ id: i.id, patch: { isActive: e.target.checked } })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell align="right">
+                          <IconButton size="small" onClick={() => openEditIncluded(i)}>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              if (window.confirm(t('admin.pricing.deleteIncludedConfirm'))) {
+                                removeIncluded.mutate(i.id);
+                              }
+                            }}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
         </Stack>
       )}
 
@@ -332,11 +437,17 @@ export function PricingPage() {
         <DialogContent>
           <Stack spacing={2} mt={1}>
             <TextField
-              label={t('admin.pricing.name')}
+              label={t('admin.pricing.nameUk')}
               value={ruleForm.name}
               onChange={(e) => setRuleForm((f) => ({ ...f, name: e.target.value }))}
               fullWidth
               autoFocus
+            />
+            <TextField
+              label={t('admin.pricing.nameEn')}
+              value={ruleForm.nameEn}
+              onChange={(e) => setRuleForm((f) => ({ ...f, nameEn: e.target.value }))}
+              fullWidth
             />
             <TextField
               select
@@ -422,7 +533,7 @@ export function PricingPage() {
           <Button onClick={closeRuleDialog}>{t('admin.pricing.cancel')}</Button>
           <Button
             variant="contained"
-            disabled={!ruleForm.name.trim() || createRule.isPending || updateRule.isPending}
+            disabled={!ruleForm.name.trim() || !ruleForm.nameEn.trim() || createRule.isPending || updateRule.isPending}
             onClick={saveRule}
           >
             {t('admin.pricing.save')}
@@ -436,16 +547,29 @@ export function PricingPage() {
         <DialogContent>
           <Stack spacing={2} mt={1}>
             <TextField
-              label={t('admin.pricing.name')}
+              label={t('admin.pricing.nameUk')}
               value={addonForm.name}
               onChange={(e) => setAddonForm((f) => ({ ...f, name: e.target.value }))}
               fullWidth
               autoFocus
             />
             <TextField
-              label={t('admin.pricing.description')}
+              label={t('admin.pricing.nameEn')}
+              value={addonForm.nameEn}
+              onChange={(e) => setAddonForm((f) => ({ ...f, nameEn: e.target.value }))}
+              fullWidth
+            />
+            <TextField
+              label={t('admin.pricing.descriptionUk')}
               value={addonForm.description}
               onChange={(e) => setAddonForm((f) => ({ ...f, description: e.target.value }))}
+              multiline
+              minRows={2}
+            />
+            <TextField
+              label={t('admin.pricing.descriptionEn')}
+              value={addonForm.descriptionEn}
+              onChange={(e) => setAddonForm((f) => ({ ...f, descriptionEn: e.target.value }))}
               multiline
               minRows={2}
             />
@@ -481,8 +605,69 @@ export function PricingPage() {
           <Button onClick={closeAddonDialog}>{t('admin.pricing.cancel')}</Button>
           <Button
             variant="contained"
-            disabled={!addonForm.name.trim() || createAddon.isPending || updateAddon.isPending}
+            disabled={!addonForm.name.trim() || !addonForm.nameEn.trim() || createAddon.isPending || updateAddon.isPending}
             onClick={saveAddon}
+          >
+            {t('admin.pricing.save')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Included-item dialog */}
+      <Dialog open={includedDialogId !== undefined} onClose={closeIncludedDialog} fullWidth maxWidth="xs">
+        <DialogTitle>
+          {includedDialogId ? t('admin.pricing.editIncluded') : t('admin.pricing.addIncluded')}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} mt={1}>
+            <TextField
+              label={t('admin.pricing.nameUk')}
+              value={includedForm.name}
+              onChange={(e) => setIncludedForm((f) => ({ ...f, name: e.target.value }))}
+              fullWidth
+              autoFocus
+            />
+            <TextField
+              label={t('admin.pricing.nameEn')}
+              value={includedForm.nameEn}
+              onChange={(e) => setIncludedForm((f) => ({ ...f, nameEn: e.target.value }))}
+              fullWidth
+            />
+            <TextField
+              select
+              label={t('admin.pricing.icon')}
+              value={includedForm.icon}
+              onChange={(e) => setIncludedForm((f) => ({ ...f, icon: e.target.value }))}
+            >
+              {INCLUDED_ICONS.map((i) => (
+                <MenuItem key={i.key} value={i.key}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    {i.icon}
+                    <span>{lang === 'en' ? i.en : i.uk}</span>
+                  </Stack>
+                </MenuItem>
+              ))}
+            </TextField>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Switch
+                checked={includedForm.isActive}
+                onChange={(e) => setIncludedForm((f) => ({ ...f, isActive: e.target.checked }))}
+              />
+              <Typography variant="body2">{t('admin.pricing.active')}</Typography>
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeIncludedDialog}>{t('admin.pricing.cancel')}</Button>
+          <Button
+            variant="contained"
+            disabled={
+              !includedForm.name.trim() ||
+              !includedForm.nameEn.trim() ||
+              createIncluded.isPending ||
+              updateIncluded.isPending
+            }
+            onClick={saveIncluded}
           >
             {t('admin.pricing.save')}
           </Button>

@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material';
 import type { AdminSettings } from '@/shared/types';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { useToast } from '@/shared/ui/ToastProvider';
 import { useAuth } from '../auth/AuthContext';
 import { useAdminSettings, useChangePassword, useSaveSettings } from '../api';
 
@@ -47,6 +48,7 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 
 function SiteSettingsForm() {
   const { t } = useLanguage();
+  const toast = useToast();
   const { data, isLoading } = useAdminSettings();
   const save = useSaveSettings();
   const [form, setForm] = useState<Form | null>(null);
@@ -65,7 +67,6 @@ function SiteSettingsForm() {
     value: form[name],
     onChange: (e: { target: { value: string } }) => {
       setForm({ ...form, [name]: e.target.value });
-      if (save.isSuccess) save.reset();
     },
     fullWidth: true,
     error: Boolean(fieldError(name)),
@@ -81,7 +82,12 @@ function SiteSettingsForm() {
       mapEmbed: form.mapEmbed,
       notificationEmail: form.notificationEmail,
       socialLinks: { instagram: form.instagram, tiktok: form.tiktok },
-    });
+    },
+      {
+        onSuccess: () => toast.success(t('admin.settings.saved')),
+        onError: () => toast.error(t('admin.settings.saveError')),
+      },
+    );
   };
 
   return (
@@ -153,8 +159,6 @@ function SiteSettingsForm() {
           />
         </Section>
 
-        {save.isError && <Alert severity="error">{t('admin.settings.saveError')}</Alert>}
-        {save.isSuccess && <Alert severity="success">{t('admin.settings.saved')}</Alert>}
         <Box>
           <Button type="submit" variant="contained" size="large" disabled={save.isPending}>
             {save.isPending ? t('admin.settings.saving') : t('admin.settings.save')}
@@ -167,6 +171,7 @@ function SiteSettingsForm() {
 
 function ChangePasswordForm() {
   const { t } = useLanguage();
+  const toast = useToast();
   const change = useChangePassword();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -186,18 +191,23 @@ function ChangePasswordForm() {
           setCurrent('');
           setNext('');
           setConfirm('');
+          toast.success(t('admin.settings.password.changed'));
+        },
+        onError: (err) => {
+          const code = apiError(err).code;
+          toast.error(
+            code === 'WRONG_PASSWORD'
+              ? t('admin.settings.password.wrongCurrent')
+              : code === 'RATE_LIMITED'
+                ? t('admin.settings.password.rateLimited')
+                : t('admin.settings.password.error'),
+          );
         },
       },
     );
   };
 
-  const { code } = apiError(change.error);
-  const errorText =
-    code === 'WRONG_PASSWORD'
-      ? t('admin.settings.password.wrongCurrent')
-      : code === 'RATE_LIMITED'
-        ? t('admin.settings.password.rateLimited')
-        : t('admin.settings.password.error');
+  const { code } = apiError(change.error); // red outline on the field only; the message is a toast
 
   return (
     <Box component="form" onSubmit={onSubmit} noValidate>
@@ -228,8 +238,6 @@ function ChangePasswordForm() {
           error={mismatch}
           helperText={mismatch ? t('admin.settings.password.mismatch') : ' '}
         />
-        {change.isError && <Alert severity="error">{errorText}</Alert>}
-        {change.isSuccess && <Alert severity="success">{t('admin.settings.password.changed')}</Alert>}
         <Box>
           <Button type="submit" variant="outlined" disabled={!canSubmit}>
             {t('admin.settings.password.submit')}

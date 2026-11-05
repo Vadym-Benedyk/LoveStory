@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogTitle,
   MenuItem,
-  Snackbar,
   Stack,
   TextField,
   Typography,
@@ -25,6 +24,7 @@ import type { Quote } from '@/shared/types';
 import { usePrice } from '@/shared/usePrice';
 import { PhoneMaskInput, isCompleteUaPhone } from '@/shared/ui/PhoneMaskInput';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { useToast } from '@/shared/ui/ToastProvider';
 import { useCreateBooking } from '../api';
 
 const fmt = (d: Dayjs) => d.format('YYYY-MM-DD');
@@ -39,8 +39,8 @@ interface Props {
 
 export function NewBookingButton({ checkIn: initialIn, checkOut: initialOut, buttonProps }: Props) {
   const { t } = useLanguage();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState<{ text: string; severity: 'success' | 'warning' } | null>(null);
 
   return (
     <>
@@ -54,26 +54,11 @@ export function NewBookingButton({ checkIn: initialIn, checkOut: initialOut, but
           onClose={() => setOpen(false)}
           onCreated={(conflicts) => {
             setOpen(false);
-            setMessage(
-              conflicts > 0
-                ? { text: t('admin.newBooking.createdWithConflicts', { count: conflicts }), severity: 'warning' }
-                : { text: t('admin.newBooking.created'), severity: 'success' },
-            );
+            if (conflicts > 0) toast.warning(t('admin.newBooking.createdWithConflicts', { count: conflicts }));
+            else toast.success(t('admin.newBooking.created'));
           }}
         />
       )}
-      <Snackbar
-        open={message !== null}
-        autoHideDuration={6000}
-        onClose={() => setMessage(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        {message ? (
-          <Alert severity={message.severity} onClose={() => setMessage(null)} variant="filled">
-            {message.text}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
     </>
   );
 }
@@ -90,6 +75,7 @@ function NewBookingDialog({
   onCreated: (conflictingPending: number) => void;
 }) {
   const { t } = useLanguage();
+  const toast = useToast();
   const price = usePrice();
   const create = useCreateBooking();
   const { data: content } = useSiteContent();
@@ -171,11 +157,20 @@ function NewBookingDialog({
         priceMinor: priceNumber === null ? undefined : Math.round(priceNumber * 100),
         internalNotes: form.internalNotes.trim() || undefined,
       },
-      { onSuccess: (res) => onCreated(res.conflictingPendingIds.length) },
+      {
+        onSuccess: (res) => onCreated(res.conflictingPendingIds.length),
+        onError: (err) =>
+          toast.error(
+            t(
+              (err as { response?: { status?: number } })?.response?.status === 409
+                ? 'admin.newBooking.errTaken'
+                : 'admin.newBooking.errGeneric',
+            ),
+          ),
+      },
     );
   };
 
-  const serverError = (create.error as { response?: { status?: number } } | null)?.response?.status;
   const nights = datesValid ? checkOut!.diff(checkIn!, 'day') : 0;
 
   return (
@@ -298,11 +293,6 @@ function NewBookingDialog({
                   .map((m) => (
                     <div key={m as string}>{m}</div>
                   ))}
-              </Alert>
-            )}
-            {create.isError && (
-              <Alert severity="error">
-                {serverError === 409 ? t('admin.newBooking.errTaken') : t('admin.newBooking.errGeneric')}
               </Alert>
             )}
           </Stack>

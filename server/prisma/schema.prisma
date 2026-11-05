@@ -92,7 +92,8 @@ model CalendarBlock {
 // ---------------------------------------------------------------------------
 model PriceRule {
   id               String    @id @default(cuid())
-  name             String
+  name             String // Ukrainian (default site language)
+  nameEn           String    @default("") // English
   kind             String // BASE | WEEKEND | SEASONAL
   nightlyRateMinor Int
   currency         String    @default("UAH")
@@ -107,9 +108,11 @@ model PriceRule {
 }
 
 model Addon {
-  id          String         @id @default(cuid())
-  name        String
-  description String?
+  id            String         @id @default(cuid())
+  name          String // Ukrainian (default site language)
+  nameEn        String         @default("") // English
+  description   String?
+  descriptionEn String?
   priceMinor  Int
   currency    String         @default("UAH")
   unit        String         @default("PER_STAY") // PER_STAY | PER_NIGHT | PER_PERSON
@@ -118,6 +121,19 @@ model Addon {
   bookings    BookingAddon[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+}
+
+// "What's included in the price" list shown on the public Prices section (e.g. cleaning, linens,
+// towels, Wi-Fi). Editable in the admin; names stored in both site languages.
+model IncludedItem {
+  id        String   @id @default(cuid())
+  name      String // Ukrainian
+  nameEn    String   @default("")
+  icon      String   @default("check") // key into the client's icon map
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model BookingAddon {

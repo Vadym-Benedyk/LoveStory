@@ -1,7 +1,6 @@
 import { useFormatDate } from '@/i18n/DateLocaleProvider';
 import { useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -19,6 +18,7 @@ import {
 } from '@mui/material';
 import type { Review, ReviewStatus } from '@/shared/types';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { useToast } from '@/shared/ui/ToastProvider';
 import { useAdminReviews, useReviewActions } from '../api';
 
 type Filter = ReviewStatus | 'ALL';
@@ -38,6 +38,7 @@ const statusChip: Record<ReviewStatus, 'warning' | 'success' | 'default'> = {
 
 export function ReviewsPage() {
   const { t } = useLanguage();
+  const toast = useToast();
   const fmtDate = useFormatDate();
   // Moderation queue first: that's what the owner comes here for.
   const [filter, setFilter] = useState<Filter>('PENDING');
@@ -47,10 +48,11 @@ export function ReviewsPage() {
   const [replyText, setReplyText] = useState('');
 
   const busy = update.isPending || remove.isPending;
-  const error = update.error || remove.error;
   const counts = data?.counts;
 
-  const setStatus = (r: Review, status: ReviewStatus) => update.mutate({ id: r.id, status });
+  const fail = () => toast.error(t('admin.reviews.error'));
+  const setStatus = (r: Review, status: ReviewStatus) =>
+    update.mutate({ id: r.id, status }, { onError: fail });
 
   const openReply = (r: Review) => {
     setReplyFor(r);
@@ -59,11 +61,11 @@ export function ReviewsPage() {
   const closeReply = () => setReplyFor(null);
   const saveReply = (text: string | null) => {
     if (!replyFor) return;
-    update.mutate({ id: replyFor.id, ownerReply: text }, { onSuccess: closeReply });
+    update.mutate({ id: replyFor.id, ownerReply: text }, { onSuccess: closeReply, onError: fail });
   };
 
   const onDelete = (r: Review) => {
-    if (window.confirm(t('admin.reviews.deleteConfirm', { name: r.authorName }))) remove.mutate(r.id);
+    if (window.confirm(t('admin.reviews.deleteConfirm', { name: r.authorName }))) remove.mutate(r.id, { onError: fail });
   };
 
   const tabLabel = (f: (typeof FILTERS)[number]) =>
@@ -89,12 +91,6 @@ export function ReviewsPage() {
           <Tab key={f.value} value={f.value} label={tabLabel(f)} />
         ))}
       </Tabs>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {t('admin.reviews.error')}
-        </Alert>
-      )}
 
       {isLoading ? (
         <Typography>{t('admin.common.loading')}</Typography>

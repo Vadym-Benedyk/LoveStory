@@ -17,9 +17,10 @@ export interface AdminCalendar {
 }
 
 // ---- Bookings ----
-export type BookingPeriod = 'week' | 'month' | 'year';
+export type BookingPeriod = 'day' | 'week' | 'month' | 'year';
 
-// status / period are optional filters (period = created within the last week / month / year).
+// status / period are optional filters (period = check-in within the current week / month / year).
+// The server returns the list sorted by check-in date.
 export const useBookings = (status?: string, period?: BookingPeriod) =>
   useQuery({
     queryKey: ['admin', 'bookings', status ?? 'ALL', period ?? 'ALL'],
@@ -265,7 +266,8 @@ export type AddonUnit = 'PER_STAY' | 'PER_NIGHT' | 'PER_PERSON';
 
 export interface PriceRule {
   id: string;
-  name: string;
+  name: string; // Ukrainian
+  nameEn: string; // English
   kind: PriceRuleKind;
   nightlyRateMinor: number;
   currency: string;
@@ -279,8 +281,10 @@ export interface PriceRule {
 
 export interface PricingAddon {
   id: string;
-  name: string;
+  name: string; // Ukrainian
+  nameEn: string; // English
   description?: string | null;
+  descriptionEn?: string | null;
   priceMinor: number;
   currency: string;
   unit: AddonUnit;
@@ -288,16 +292,33 @@ export interface PricingAddon {
   sortOrder: number;
 }
 
+// "What's included in the price" item (shown on the public Prices section).
+export interface IncludedItem {
+  id: string;
+  name: string; // Ukrainian
+  nameEn: string; // English
+  icon: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
 export const usePricing = () =>
   useQuery({
     queryKey: ['admin', 'pricing'],
     queryFn: async () =>
-      (await api.get<{ rules: PriceRule[]; addons: PricingAddon[] }>('/admin/pricing')).data,
+      (
+        await api.get<{ rules: PriceRule[]; addons: PricingAddon[]; included: IncludedItem[] }>(
+          '/admin/pricing',
+        )
+      ).data,
   });
 
 export function usePricingActions() {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['admin', 'pricing'] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['admin', 'pricing'] });
+    qc.invalidateQueries({ queryKey: ['pricing'] }); // public section
+  };
 
   const createRule = useMutation({
     mutationFn: async (vars: Partial<PriceRule>) =>
@@ -329,7 +350,32 @@ export function usePricingActions() {
     onSuccess: invalidate,
   });
 
-  return { createRule, updateRule, removeRule, createAddon, updateAddon, removeAddon };
+  const createIncluded = useMutation({
+    mutationFn: async (vars: Partial<IncludedItem>) =>
+      (await api.post<IncludedItem>('/admin/pricing/included', vars)).data,
+    onSuccess: invalidate,
+  });
+  const updateIncluded = useMutation({
+    mutationFn: async (vars: { id: string; patch: Partial<IncludedItem> }) =>
+      (await api.patch<IncludedItem>(`/admin/pricing/included/${vars.id}`, vars.patch)).data,
+    onSuccess: invalidate,
+  });
+  const removeIncluded = useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/admin/pricing/included/${id}`)).data,
+    onSuccess: invalidate,
+  });
+
+  return {
+    createRule,
+    updateRule,
+    removeRule,
+    createAddon,
+    updateAddon,
+    removeAddon,
+    createIncluded,
+    updateIncluded,
+    removeIncluded,
+  };
 }
 
 // ---- Reviews (moderation) ----

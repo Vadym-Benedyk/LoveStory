@@ -1,7 +1,6 @@
 import { useFormatDate } from '@/i18n/DateLocaleProvider';
 import { useMemo, useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -19,6 +18,7 @@ import { PickersDay, type PickersDayProps } from '@mui/x-date-pickers/PickersDay
 import dayjs, { type Dayjs } from 'dayjs';
 import { statusColors } from '@/theme/theme';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { useToast } from '@/shared/ui/ToastProvider';
 import { roomyCalendarSx } from '@/shared/ui/calendarSx';
 import { useAdminCalendar, useBlockActions } from '../api';
 import { NewBookingButton } from '../bookings/NewBookingButton';
@@ -41,6 +41,7 @@ function daysOf(ranges: { start: string; end: string }[]): Set<string> {
 
 export function CalendarPage() {
   const { t } = useLanguage();
+  const toast = useToast();
   const fmtDate = useFormatDate();
   const rangeStart = dayjs().startOf('month');
   const rangeEnd = dayjs().add(6, 'month').endOf('month');
@@ -92,7 +93,9 @@ export function CalendarPage() {
           setStart(null);
           setEnd(null);
           setReason('');
+          toast.success(t('admin.calendar.blocked'));
         },
+        onError: () => toast.error(t('admin.calendar.blockError')),
       },
     );
   };
@@ -143,7 +146,6 @@ export function CalendarPage() {
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                 />
-                {create.isError && <Alert severity="error">{t('admin.calendar.blockError')}</Alert>}
                 <Button
                   variant="contained"
                   disabled={!canBlock || create.isPending}

@@ -1,7 +1,6 @@
 import { useFormatDate } from '@/i18n/DateLocaleProvider';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -14,6 +13,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   TextField,
   Typography,
 } from '@mui/material';
@@ -22,6 +22,7 @@ import NotesIcon from '@mui/icons-material/StickyNote2Outlined';
 import type { Booking, BookingStatus } from '@/shared/types';
 import { usePrice } from '@/shared/usePrice';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { useToast } from '@/shared/ui/ToastProvider';
 import { useBookings, useBookingActions, type BookingPeriod } from '../api';
 import { NewBookingButton } from './NewBookingButton';
 import { BookingDetailsDrawer } from './BookingDetailsDrawer';
@@ -36,10 +37,11 @@ const STATUS_FILTERS: { value: string; key: string }[] = [
 ];
 
 const PERIOD_FILTERS: { value: BookingPeriod | 'ALL'; key: string }[] = [
-  { value: 'ALL', key: 'admin.bookings.period.all' },
+  { value: 'day', key: 'admin.bookings.period.day' },
   { value: 'week', key: 'admin.bookings.period.week' },
   { value: 'month', key: 'admin.bookings.period.month' },
   { value: 'year', key: 'admin.bookings.period.year' },
+  { value: 'ALL', key: 'admin.bookings.period.all' },
 ];
 
 const statusChip: Record<BookingStatus, 'default' | 'success' | 'warning' | 'error'> = {
@@ -60,30 +62,37 @@ const statusLabel: Record<BookingStatus, string> = {
 
 export function BookingsPage() {
   const { t } = useLanguage();
+  const toast = useToast();
   const price = usePrice();
   const fmtDate = useFormatDate();
   const [filter, setFilter] = useState('ALL');
   const [openId, setOpenId] = useState<string | null>(null);
-  const [period, setPeriod] = useState<BookingPeriod | 'ALL'>('ALL');
+  // Sort by check-in date; the server already returns earliest first (ties: newest request first).
+  const [dateDir, setDateDir] = useState<'asc' | 'desc'>('asc');
+  const [period, setPeriod] = useState<BookingPeriod | 'ALL'>('week');
   const { data, isLoading } = useBookings(
     filter === 'ALL' ? undefined : filter,
     period === 'ALL' ? undefined : period,
   );
   const { confirm, setStatus } = useBookingActions();
 
-  const busy = confirm.isPending || setStatus.isPending;
-  // Last failed action (e.g. confirming dates that another stay already took → 409).
-  const actionError = (confirm.error ?? setStatus.error) as { response?: { status?: number } } | null;
-  const actionErrorText = actionError
-    ? t(actionError.response?.status === 409 ? 'admin.bookings.actionConflict' : 'admin.bookings.actionError')
-    : null;
+  // Stable sort: bookings with the same check-in keep the server's order in both directions.
+  const rows = useMemo(() => {
+    const list = [...(data ?? [])];
+    const sign = dateDir === 'asc' ? 1 : -1;
+    return list.sort((a, b) => sign * a.checkIn.slice(0, 10).localeCompare(b.checkIn.slice(0, 10)));
+  }, [data, dateDir]);
 
-  // Clear the previous action's error before a new one, so a stale message never lingers.
-  const run = (action: () => void) => {
-    confirm.reset();
-    setStatus.reset();
-    action();
-  };
+  const busy = confirm.isPending || setStatus.isPending;
+  // Failed actions (e.g. confirming dates that another stay already took → 409) show as a toast.
+  const onActionError = (err: unknown) =>
+    toast.error(
+      t(
+        (err as { response?: { status?: number } })?.response?.status === 409
+          ? 'admin.bookings.actionConflict'
+          : 'admin.bookings.actionError',
+      ),
+    );
 
   // Same actions in the table row (compact, right-aligned) and the details panel.
   const renderActions = (b: Booking, place: 'row' | 'panel' = 'row') => {
@@ -95,7 +104,7 @@ export function BookingsPage() {
             size={size}
             color="error"
             disabled={busy}
-            onClick={() => run(() => setStatus.mutate({ id: b.id, status: 'DECLINED' }))}
+            onClick={() => setStatus.mutate({ id: b.id, status: 'DECLINED' }, { onError: onActionError })}
           >
             {t('admin.bookings.decline')}
           </Button>
@@ -103,7 +112,7 @@ export function BookingsPage() {
             size={size}
             variant="contained"
             disabled={busy}
-            onClick={() => run(() => confirm.mutate(b.id))}
+            onClick={() => confirm.mutate(b.id, { onError: onActionError })}
           >
             {t('admin.bookings.confirm')}
           </Button>
@@ -118,7 +127,7 @@ export function BookingsPage() {
             size={size}
             color="error"
             disabled={busy}
-            onClick={() => run(() => setStatus.mutate({ id: b.id, status: 'CANCELLED' }))}
+            onClick={() => setStatus.mutate({ id: b.id, status: 'CANCELLED' }, { onError: onActionError })}
           >
             {t('admin.bookings.cancel')}
           </Button>
@@ -129,7 +138,7 @@ export function BookingsPage() {
     if (b.status === 'DECLINED' && place === 'panel') {
       return (
         <Box>
-          <Button variant="contained" size={size} disabled={busy} onClick={() => run(() => confirm.mutate(b.id))}>
+          <Button variant="contained" size={size} disabled={busy} onClick={() => confirm.mutate(b.id, { onError: onActionError })}>
             {t('admin.bookings.accept')}
           </Button>
         </Box>
@@ -181,12 +190,6 @@ export function BookingsPage() {
         </Stack>
       </Stack>
 
-      {actionErrorText && openId === null && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => (confirm.reset(), setStatus.reset())}>
-          {actionErrorText}
-        </Alert>
-      )}
-
       {isLoading ? (
         <Typography>{t('admin.common.loading')}</Typography>
       ) : (data?.length ?? 0) === 0 ? (
@@ -198,7 +201,16 @@ export function BookingsPage() {
               <TableRow>
                 <TableCell>{t('admin.bookings.col.ref')}</TableCell>
                 <TableCell>{t('admin.bookings.col.guest')}</TableCell>
-                <TableCell>{t('admin.bookings.col.dates')}</TableCell>
+                <TableCell sortDirection={dateDir}>
+                  <TableSortLabel
+                    active
+                    direction={dateDir}
+                    onClick={() => setDateDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                    title={t(dateDir === 'asc' ? 'admin.bookings.sortDesc' : 'admin.bookings.sortAsc')}
+                  >
+                    {t('admin.bookings.col.dates')}
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell>{t('admin.bookings.col.guests')}</TableCell>
                 <TableCell>{t('admin.bookings.col.quote')}</TableCell>
                 <TableCell>{t('admin.bookings.col.status')}</TableCell>
@@ -206,8 +218,8 @@ export function BookingsPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {data?.map((b) => (
-                <TableRow key={b.id} hover onClick={() => (confirm.reset(), setStatus.reset(), setOpenId(b.id))} sx={{ cursor: 'pointer' }}>
+              {rows.map((b) => (
+                <TableRow key={b.id} hover onClick={() => setOpenId(b.id)} sx={{ cursor: 'pointer' }}>
                   <TableCell>
                     {b.reference}
                     {b.source === 'MANUAL' && (
@@ -256,12 +268,7 @@ export function BookingsPage() {
         booking={data?.find((b) => b.id === openId) ?? null}
         statusLabel={(b) => t(statusLabel[b.status])}
         statusColor={(b) => statusChip[b.status]}
-        renderActions={(b) => (
-          <>
-            {renderActions(b, 'panel')}
-            {actionErrorText && <Alert severity="error">{actionErrorText}</Alert>}
-          </>
-        )}
+        renderActions={(b) => renderActions(b, 'panel')}
         onClose={() => setOpenId(null)}
       />
     </>

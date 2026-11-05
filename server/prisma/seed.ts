@@ -1,4 +1,4 @@
-import * as bcrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs';
 import 'dotenv/config';
 import { prisma } from '../src/lib/prisma.js';
 
@@ -14,6 +14,47 @@ const defaultContent: Record<string, string> = {
     'Tucked away on an isolated stretch of riverbank, this 60 m² guest house is built for slowing down. Total privacy, the sound of the water, and nothing on the schedule but rest.',
   'contact.note': 'Bookings are confirmed personally by phone. Reach out any time.',
 };
+
+// Stay terms under the price tables (editable in admin → Content). Both site languages.
+const termsContent: Record<'uk' | 'en', Record<string, string>> = {
+  uk: {
+    'pricing.terms.payment': 'Передоплата не потрібна. Розрахунок — під час заселення.',
+    'pricing.terms.times': 'Заїзд — з 14:00, виїзд — до 12:00.',
+    'pricing.terms.deposit': 'Застава не потрібна.',
+    'pricing.terms.guests':
+      'У вартість включено проживання двох гостей. За кожне додаткове місце передбачена доплата — вартість уточнюйте під час бронювання.',
+    'pricing.terms.pets': 'За домовленістю.',
+    'pricing.terms.parties': 'Дозволені до 23:00.',
+  },
+  en: {
+    'pricing.terms.payment': 'No prepayment required. You pay on arrival.',
+    'pricing.terms.times': 'Check-in from 14:00, check-out until 12:00.',
+    'pricing.terms.deposit': 'No deposit required.',
+    'pricing.terms.guests':
+      'The price includes two guests. Each additional place is charged extra — ask for the price when booking.',
+    'pricing.terms.pets': 'By arrangement.',
+    'pricing.terms.parties': 'Allowed until 23:00.',
+  },
+};
+
+// "What's included in the base rate" (icon keys: client/src/shared/ui/includedIcons.tsx).
+const includedItems: { name: string; nameEn: string; icon: string }[] = [
+  { name: 'Проживання', nameEn: 'Accommodation', icon: 'home' },
+  { name: 'Прибирання', nameEn: 'Cleaning', icon: 'cleaning' },
+  { name: 'Нова постільна білизна', nameEn: 'Fresh bed linen', icon: 'bed' },
+  { name: 'Рушники', nameEn: 'Towels', icon: 'towel' },
+  { name: 'Тапочки', nameEn: 'Slippers', icon: 'slippers' },
+  { name: 'Світло', nameEn: 'Electricity', icon: 'light' },
+  { name: 'Вода', nameEn: 'Water', icon: 'water' },
+  { name: 'Телевізор', nameEn: 'TV', icon: 'tv' },
+  { name: 'Холодильник', nameEn: 'Fridge', icon: 'fridge' },
+  { name: 'Кондиціонер', nameEn: 'Air conditioning', icon: 'ac' },
+  { name: 'Камін', nameEn: 'Fireplace', icon: 'fireplace' },
+  { name: 'Душ', nameEn: 'Shower', icon: 'shower' },
+  { name: 'Риболовля', nameEn: 'Fishing', icon: 'fishing' },
+  { name: 'Парковка', nameEn: 'Parking', icon: 'parking' },
+  { name: 'Інтернет', nameEn: 'Internet', icon: 'wifi' },
+];
 
 async function main() {
   // Owner
@@ -48,14 +89,25 @@ async function main() {
     });
   }
 
+  for (const [locale, blocks] of Object.entries(termsContent)) {
+    for (const [key, value] of Object.entries(blocks)) {
+      await prisma.contentBlock.upsert({
+        where: { key_locale: { key, locale } },
+        update: {},
+        create: { key, locale, value },
+      });
+    }
+  }
+
   // Base + weekend price rules
   const base = await prisma.priceRule.findFirst({ where: { kind: 'BASE' } });
   if (!base) {
     await prisma.priceRule.createMany({
       data: [
-        { name: 'Standard nightly', kind: 'BASE', nightlyRateMinor: 350000, currency: CURRENCY, priority: 0 },
+        { name: 'Стандартний тариф', nameEn: 'Standard rate', kind: 'BASE', nightlyRateMinor: 350000, currency: CURRENCY, priority: 0 },
         {
-          name: 'Weekend',
+          name: 'Вихідні',
+          nameEn: 'Weekend',
           kind: 'WEEKEND',
           nightlyRateMinor: 450000,
           currency: CURRENCY,
@@ -71,11 +123,16 @@ async function main() {
   if (addonCount === 0) {
     await prisma.addon.createMany({
       data: [
-        { name: 'Firewood bundle', priceMinor: 30000, unit: 'PER_STAY', sortOrder: 1, currency: CURRENCY },
-        { name: 'Heated tub session', priceMinor: 50000, unit: 'PER_NIGHT', sortOrder: 2, currency: CURRENCY },
-        { name: 'Welcome basket', priceMinor: 60000, unit: 'PER_STAY', sortOrder: 3, currency: CURRENCY },
+        { name: 'Теплий чан', nameEn: 'Hot tub', priceMinor: 500000, unit: 'PER_STAY', sortOrder: 1, currency: CURRENCY },
+        { name: 'Мангал', nameEn: 'BBQ grill', priceMinor: 0, unit: 'PER_STAY', sortOrder: 2, currency: CURRENCY },
+        { name: 'Дрова (в’язка)', nameEn: 'Firewood bundle', priceMinor: 30000, unit: 'PER_STAY', sortOrder: 3, currency: CURRENCY },
       ],
     });
+  }
+
+  // "What's included" list
+  if ((await prisma.includedItem.count()) === 0) {
+    await prisma.includedItem.createMany({ data: includedItems.map((i, n) => ({ ...i, sortOrder: n })) });
   }
 
   // Sample approved review

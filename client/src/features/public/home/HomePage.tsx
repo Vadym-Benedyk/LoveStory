@@ -9,6 +9,7 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
 import PlaceIcon from '@mui/icons-material/Place';
 import PetsIcon from '@mui/icons-material/Pets';
+import { PricingSection } from './PricingSection';
 import { useGallery, useReviews, useSiteContent } from '@/shared/api/queries';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { Lightbox } from '@/shared/ui/Lightbox';
@@ -122,16 +123,8 @@ export function HomePage() {
         </Container>
       </Box>
 
-      {/* Pricing teaser */}
-      <Container component="section" id="pricing" className={styles.section}>
-        <Typography variant="h2" gutterBottom>
-          {t('pricing.title')}
-        </Typography>
-        <Typography className={styles.lead}>{t('pricing.body')}</Typography>
-        <Button variant="contained" component={RouterLink} to="/booking" sx={{ mt: 2 }}>
-          {t('cta.seeDatesPrices')}
-        </Button>
-      </Container>
+      {/* Prices: tariffs, what's included, paid extras, terms (all from the DB) */}
+      <PricingSection />
 
       {/* Reviews */}
       {reviews && reviews.reviews.length > 0 && (

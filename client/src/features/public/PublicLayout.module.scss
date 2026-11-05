@@ -190,3 +190,13 @@
     display: none;
   }
 }
+
+.footerLink {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}

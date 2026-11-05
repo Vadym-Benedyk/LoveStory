@@ -256,26 +256,34 @@ export async function setStatus(
   return updated;
 }
 
-export type BookingPeriod = 'week' | 'month' | 'year';
+export type BookingPeriod = 'day' | 'week' | 'month' | 'year';
 
-// Start of the "last week / month / year" window, counted back from now (rolling window,
-// not calendar week/month): 7 days, 1 month, 1 year.
-export function periodStart(period: BookingPeriod, now = new Date()): Date {
-  const d = new Date(now);
-  if (period === 'week') d.setUTCDate(d.getUTCDate() - 7);
-  else if (period === 'month') d.setUTCMonth(d.getUTCMonth() - 1);
-  else d.setUTCFullYear(d.getUTCFullYear() - 1);
-  return d;
+// Calendar window containing `now`, as a half-open range [from, to) of UTC dates:
+// day = today, week = Monday–Sunday, month = calendar month, year = calendar year.
+export function periodRange(period: BookingPeriod, now = new Date()): { from: Date; to: Date } {
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  const d = now.getUTCDate();
+  if (period === 'day') return { from: new Date(Date.UTC(y, m, d)), to: new Date(Date.UTC(y, m, d + 1)) };
+  if (period === 'week') {
+    const sinceMonday = (now.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
+    const from = new Date(Date.UTC(y, m, d - sinceMonday));
+    return { from, to: new Date(Date.UTC(y, m, d - sinceMonday + 7)) };
+  }
+  if (period === 'month') return { from: new Date(Date.UTC(y, m, 1)), to: new Date(Date.UTC(y, m + 1, 1)) };
+  return { from: new Date(Date.UTC(y, 0, 1)), to: new Date(Date.UTC(y + 1, 0, 1)) };
 }
 
-// Optional filters: status, and period = bookings CREATED within the last week/month/year.
+// Optional filters: status, and period = bookings whose CHECK-IN date falls in the current
+// week / month / year. Always sorted by check-in date (earliest first); ties: newest request first.
 export async function listBookings(status?: string, period?: BookingPeriod) {
+  const range = period ? periodRange(period) : null;
   return prisma.booking.findMany({
     where: {
       ...(status ? { status: status as never } : {}),
-      ...(period ? { createdAt: { gte: periodStart(period) } } : {}),
+      ...(range ? { checkIn: { gte: range.from, lt: range.to } } : {}),
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ checkIn: 'asc' }, { createdAt: 'desc' }],
     include: {
       addons: { include: { addon: true } },
       appliedPromotion: true,

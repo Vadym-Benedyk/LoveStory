@@ -91,7 +91,7 @@ export const adminCreateBookingSchema = z
 
 export const listBookingsQuerySchema = z.object({
   status: z.enum(['PENDING', 'CONFIRMED', 'DECLINED', 'EXPIRED', 'CANCELLED']).optional(),
-  period: z.enum(['week', 'month', 'year']).optional(),
+  period: z.enum(['day', 'week', 'month', 'year']).optional(),
 });
 
 export const updateNotesSchema = z.object({

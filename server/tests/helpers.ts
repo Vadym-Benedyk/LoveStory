@@ -34,6 +34,7 @@ export async function resetDb() {
     prisma.media.deleteMany(),
     prisma.review.deleteMany(),
     prisma.addon.deleteMany(),
+    prisma.includedItem.deleteMany(),
     prisma.priceRule.deleteMany(),
     prisma.contentBlock.deleteMany(),
     prisma.siteSettings.deleteMany(),

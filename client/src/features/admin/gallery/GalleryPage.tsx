@@ -20,6 +20,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import UploadIcon from '@mui/icons-material/Upload';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { useToast } from '@/shared/ui/ToastProvider';
 import { useMedia, useMediaActions, type MediaCategory, type MediaItem } from '../api';
 
 const CATEGORIES: MediaCategory[] = ['HOUSE', 'RIVER', 'BBQ', 'TUB', 'NATURE', 'OTHER'];
@@ -27,13 +28,13 @@ const categoryKey = (c: MediaCategory) => `admin.gallery.category.${c.toLowerCas
 
 export function GalleryPage() {
   const { t } = useLanguage();
+  const toast = useToast();
   const { data, isLoading } = useMedia();
   const { upload, update, remove, reorder } = useMediaActions();
 
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploadCategory, setUploadCategory] = useState<MediaCategory>('OTHER');
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
   const [storageUnavailable, setStorageUnavailable] = useState(false);
 
   const items = data ?? [];
@@ -41,7 +42,6 @@ export function GalleryPage() {
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
     const files = Array.from(fileList);
-    setUploadError(null);
     setStorageUnavailable(false);
     setProgress({ done: 0, total: files.length });
     for (const file of files) {
@@ -51,7 +51,7 @@ export function GalleryPage() {
         if (err?.response?.status === 503) {
           setStorageUnavailable(true);
         } else {
-          setUploadError(t('admin.gallery.uploadError', { name: file.name }));
+          toast.error(t('admin.gallery.uploadError', { name: file.name }));
         }
       }
       setProgress((p) => (p ? { done: p.done + 1, total: p.total } : p));
@@ -121,7 +121,6 @@ export function GalleryPage() {
       </Stack>
 
       {storageUnavailable && <Alert severity="warning" sx={{ mb: 2 }}>{t('admin.gallery.storageNotConfigured')}</Alert>}
-      {uploadError && <Alert severity="error" sx={{ mb: 2 }}>{uploadError}</Alert>}
 
       {isLoading ? (
         <Typography>{t('admin.common.loading')}</Typography>

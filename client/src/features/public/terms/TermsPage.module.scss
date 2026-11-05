@@ -1,0 +1,72 @@
+@use '@/styles/tokens' as t;
+
+.page {
+  padding-block: t.$space-section;
+}
+
+.updated {
+  color: rgba(43, 38, 32, 0.6);
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.toc {
+  margin: 2rem 0 3rem;
+  padding: 1.25rem 1.5rem;
+  background: t.$cream;
+  border-radius: 8px;
+
+  ol {
+    margin: 0.5rem 0 0;
+    padding-left: 1.4rem;
+    columns: 1;
+
+    @include t.up(t.$bp-md) {
+      columns: 2;
+      column-gap: 2.5rem;
+    }
+  }
+
+  li {
+    margin-bottom: 0.35rem;
+    break-inside: avoid;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.section {
+  margin-bottom: 2.25rem;
+  scroll-margin-top: 88px;
+
+  p {
+    margin: 0 0 0.75rem;
+    line-height: 1.7;
+    max-width: 75ch;
+  }
+
+  ul {
+    margin: 0 0 0.75rem;
+    padding-left: 1.3rem;
+    max-width: 75ch;
+  }
+
+  li {
+    margin-bottom: 0.4rem;
+    line-height: 1.6;
+  }
+}
+
+.contact {
+  margin-top: 3rem;
+  padding: 1.5rem;
+  background: t.$cream;
+  border-radius: 8px;
+}

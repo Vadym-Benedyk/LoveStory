@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   AppBar,
   Toolbar,
@@ -41,6 +41,8 @@ const currentYear = new Date().getFullYear();
 
 export function PublicLayout() {
   const navigate = useNavigate();
+  // The Terms page is a plain document: no site header there.
+  const hideHeader = useLocation().pathname === '/terms';
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const { data: content } = useSiteContent();
@@ -56,7 +58,8 @@ export function PublicLayout() {
 
   return (
     <div className={styles.shell}>
-      <AppBar
+      {!hideHeader && (
+        <AppBar
         position="sticky"
         color="transparent"
         elevation={0}
@@ -107,10 +110,12 @@ export function PublicLayout() {
             <BurgerIcon open={menuOpen} />
           </IconButton>
         </Toolbar>
-      </AppBar>
+        </AppBar>
+      )}
 
       {/* Mobile full-screen navigation menu */}
-      <Drawer
+      {!hideHeader && (
+        <Drawer
         variant="temporary"
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
@@ -184,7 +189,8 @@ export function PublicLayout() {
             {t('cta.bookNow')}
           </Button>
         </Box>
-      </Drawer>
+        </Drawer>
+      )}
 
       <main>
         <Outlet />
@@ -223,6 +229,9 @@ export function PublicLayout() {
           </div>
 
           <div className={styles.footerBottom}>
+            <RouterLink to="/terms" className={styles.footerLink}>
+              {t('footer.terms')}
+            </RouterLink>
             <span>© {currentYear} LoveStory Riverside Retreat. {t('footer.rights')}</span>
             <span>
              Produced by{' '}

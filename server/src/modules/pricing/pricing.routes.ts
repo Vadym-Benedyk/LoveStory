@@ -20,17 +20,20 @@ adminPricingRouter.use(requireAuth, requireRole('OWNER'));
 adminPricingRouter.get(
   '/',
   asyncHandler(async (_req, res) => {
-    const [rules, addons] = await Promise.all([
+    const [rules, addons, included] = await Promise.all([
       prisma.priceRule.findMany({ orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }] }),
       prisma.addon.findMany({ orderBy: { sortOrder: 'asc' } }),
+      prisma.includedItem.findMany({ orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] }),
     ]);
-    res.json({ rules, addons });
+    res.json({ rules, addons, included });
   }),
 );
 
 // ---- Price rules ----
+// Names are stored in both site languages: `name` = Ukrainian (default), `nameEn` = English.
 const ruleObject = z.object({
-  name: z.string().min(1).max(120),
+  name: z.string().trim().min(1).max(120),
+  nameEn: z.string().trim().min(1).max(120),
   kind: z.enum(RULE_KINDS),
   nightlyRateMinor: z.number().int().min(0),
   currency: z.string().min(1).max(8).default(env.DEFAULT_CURRENCY),
@@ -85,8 +88,10 @@ adminPricingRouter.delete(
 
 // ---- Add-ons ----
 const addonBody = z.object({
-  name: z.string().min(1).max(120),
-  description: z.string().max(500).optional().nullable(),
+  name: z.string().trim().min(1).max(120),
+  nameEn: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500).optional().nullable(),
+  descriptionEn: z.string().trim().max(500).optional().nullable(),
   priceMinor: z.number().int().min(0),
   currency: z.string().min(1).max(8).default(env.DEFAULT_CURRENCY),
   unit: z.enum(ADDON_UNITS).default('PER_STAY'),
@@ -121,6 +126,46 @@ adminPricingRouter.delete(
   asyncHandler(async (req, res) => {
     const id = req.params.id as string;
     await prisma.addon.delete({ where: { id } });
+    res.json({ ok: true });
+  }),
+);
+
+// ---- "What's included in the price" items ----
+const includedBody = z.object({
+  name: z.string().trim().min(1).max(120),
+  nameEn: z.string().trim().min(1).max(120),
+  icon: z.string().trim().min(1).max(40).default('check'),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().int().optional(),
+});
+
+adminPricingRouter.post(
+  '/included',
+  validate({ body: includedBody }),
+  asyncHandler(async (req, res) => {
+    const data = req.body as z.infer<typeof includedBody>;
+    if (data.sortOrder == null) {
+      const last = await prisma.includedItem.findFirst({ orderBy: { sortOrder: 'desc' } });
+      data.sortOrder = (last?.sortOrder ?? -1) + 1;
+    }
+    res.status(201).json(await prisma.includedItem.create({ data }));
+  }),
+);
+
+adminPricingRouter.patch(
+  '/included/:id',
+  validate({ body: includedBody.partial() }),
+  asyncHandler(async (req, res) => {
+    const id = req.params.id as string;
+    res.json(await prisma.includedItem.update({ where: { id }, data: req.body }));
+  }),
+);
+
+adminPricingRouter.delete(
+  '/included/:id',
+  asyncHandler(async (req, res) => {
+    const id = req.params.id as string;
+    await prisma.includedItem.delete({ where: { id } });
     res.json({ ok: true });
   }),
 );

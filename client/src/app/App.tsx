@@ -4,6 +4,7 @@ import { CircularProgress, Box } from '@mui/material';
 import { PublicLayout } from '@/features/public/PublicLayout';
 import { HomePage } from '@/features/public/home/HomePage';
 import { BookingPage } from '@/features/public/booking/BookingPage';
+import { TermsPage } from '@/features/public/terms/TermsPage';
 
 // Admin is a separate code-split bundle — never shipped to public visitors.
 const AdminApp = lazy(() => import('@/features/admin/AdminApp'));
@@ -27,6 +28,7 @@ export function App() {
       <Route element={<PublicLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/booking" element={<BookingRoute />} />
+        <Route path="/terms" element={<TermsPage />} />
       </Route>
       <Route
         path="/admin/*"

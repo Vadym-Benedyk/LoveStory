@@ -85,11 +85,12 @@ publicContentRouter.get(
 publicContentRouter.get(
   '/pricing',
   asyncHandler(async (_req, res) => {
-    const [rules, addons] = await Promise.all([
+    const [rules, addons, included] = await Promise.all([
       prisma.priceRule.findMany({ where: { isActive: true }, orderBy: { priority: 'desc' } }),
       prisma.addon.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }),
+      prisma.includedItem.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] }),
     ]);
-    res.json({ rules, addons });
+    res.json({ rules, addons, included });
   }),
 );
 
@@ -135,7 +136,7 @@ adminContentRouter.put(
   validate({
     body: z.object({
       locale: z.enum(LOCALES).default(DEFAULT_LOCALE),
-      blocks: z.array(z.object({ key: z.string().min(1).max(120), value: z.string().max(20000) })),
+      blocks: z.array(z.object({ key: z.string().min(1).max(120), value: z.string().max(60000) })),
     }),
   }),
   asyncHandler(async (req, res) => {

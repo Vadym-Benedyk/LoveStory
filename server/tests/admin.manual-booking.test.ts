@@ -1,5 +1,6 @@
 // Admin "new booking" (POST /admin/bookings): phone/walk-in guests entered by the owner.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { periodRange } from '../src/modules/booking/booking.service.js';
 import { call, createUser, day, prisma, resetDb, startServer, type TestServer } from './helpers.js';
 
 let srv: TestServer;
@@ -148,37 +149,54 @@ describe('booking notes', () => {
 });
 
 describe('bookings list filters', () => {
-  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
-  const seed = (ref: string, createdAt: Date, status = 'PENDING') =>
+  const seed = (ref: string, checkIn: string, status = 'PENDING') =>
     prisma.booking.create({
       data: {
         reference: ref,
         guestName: ref,
         guestPhone: '+380500000001',
-        checkIn: new Date(`${day(40)}T00:00:00Z`),
-        checkOut: new Date(`${day(41)}T00:00:00Z`),
+        checkIn: new Date(`${checkIn}T00:00:00Z`),
+        checkOut: new Date(new Date(`${checkIn}T00:00:00Z`).getTime() + 86_400_000),
         priceQuoteMinor: 0,
-        createdAt,
         status,
       },
     });
   const refs = async (qs: string) =>
-    (await call<{ reference: string }[]>(srv, 'GET', `/admin/bookings${qs}`, { token: owner })).body
-      .map((b) => b.reference)
-      .sort();
+    (await call<{ reference: string }[]>(srv, 'GET', `/admin/bookings${qs}`, { token: owner })).body.map(
+      (b) => b.reference,
+    );
 
-  it('filters by the period the booking was created in, combinable with status', async () => {
-    await seed('TODAY000', daysAgo(0));
-    await seed('WEEK0006', daysAgo(6));
-    await seed('MONTH020', daysAgo(20), 'DECLINED');
-    await seed('YEAR0200', daysAgo(200), 'DECLINED');
-    await seed('OLD00800', daysAgo(800));
+  it('periodRange: calendar week (Mon–Sun), month and year around a given day', () => {
+    const wed = new Date('2026-11-04T15:00:00Z'); // a Wednesday
+    const iso = (r: { from: Date; to: Date }) => [r.from, r.to].map((d) => d.toISOString().slice(0, 10));
+    expect(iso(periodRange('day', wed))).toEqual(['2026-11-04', '2026-11-05']);
+    expect(iso(periodRange('week', wed))).toEqual(['2026-11-02', '2026-11-09']);
+    expect(iso(periodRange('week', new Date('2026-11-08T10:00:00Z')))).toEqual(['2026-11-02', '2026-11-09']); // Sunday
+    expect(iso(periodRange('week', new Date('2026-11-09T00:00:00Z')))).toEqual(['2026-11-09', '2026-11-16']); // Monday
+    expect(iso(periodRange('month', wed))).toEqual(['2026-11-01', '2026-12-01']);
+    expect(iso(periodRange('month', new Date('2026-12-31T23:00:00Z')))).toEqual(['2026-12-01', '2027-01-01']);
+    expect(iso(periodRange('year', wed))).toEqual(['2026-01-01', '2027-01-01']);
+  });
 
-    expect(await refs('')).toHaveLength(5);
-    expect(await refs('?period=week')).toEqual(['TODAY000', 'WEEK0006']);
-    expect(await refs('?period=month')).toEqual(['MONTH020', 'TODAY000', 'WEEK0006']);
-    expect(await refs('?period=year')).toEqual(['MONTH020', 'TODAY000', 'WEEK0006', 'YEAR0200']);
-    expect(await refs('?period=year&status=DECLINED')).toEqual(['MONTH020', 'YEAR0200']);
+  it('filters by CHECK-IN date, combinable with status, sorted by check-in (earliest first)', async () => {
+    await seed('LATER000', day(400));
+    await seed('TODAY000', day(0), 'DECLINED');
+    await seed('EARLIER0', day(-400));
+    await seed('FAR00000', day(800));
+
+    // Sorted by check-in regardless of creation order.
+    expect(await refs('')).toEqual(['EARLIER0', 'TODAY000', 'LATER000', 'FAR00000']);
+    // Today always lies in the current week / month / year; the ±400-day ones never do.
+    for (const period of ['day', 'week', 'month', 'year']) expect(await refs(`?period=${period}`)).toEqual(['TODAY000']);
+    expect(await refs('?period=year&status=DECLINED')).toEqual(['TODAY000']);
+    expect(await refs('?period=year&status=PENDING')).toEqual([]);
+  });
+
+  it('puts bookings with the same check-in newest-request first', async () => {
+    const older = await seed('OLDER000', day(5));
+    await prisma.booking.update({ where: { id: older.id }, data: { createdAt: new Date(Date.now() - 86_400_000) } });
+    await seed('NEWER000', day(5));
+    expect(await refs('')).toEqual(['NEWER000', 'OLDER000']);
   });
 
   it('rejects an unknown period or status', async () => {

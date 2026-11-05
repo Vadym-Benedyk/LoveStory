@@ -5,6 +5,7 @@ import type { PriceRule } from '@prisma/client';
 const rule = (over: Partial<PriceRule>): PriceRule => ({
   id: Math.random().toString(36),
   name: 'r',
+  nameEn: 'r',
   kind: 'BASE',
   nightlyRateMinor: 10000,
   currency: 'UAH',

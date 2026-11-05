@@ -2,7 +2,6 @@
 // confirmed it, the guest's comment and the manager's editable private note.
 import { useEffect, useState, type ReactNode } from 'react';
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -18,6 +17,7 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import type { Booking } from '@/shared/types';
 import { usePrice } from '@/shared/usePrice';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { useToast } from '@/shared/ui/ToastProvider';
 import { useFormatDate } from '@/i18n/DateLocaleProvider';
 import { useUpdateBookingNotes } from '../api';
 
@@ -49,6 +49,7 @@ export function BookingDetailsDrawer({
   onClose: () => void;
 }) {
   const { t, tp } = useLanguage();
+  const toast = useToast();
   const price = usePrice();
   const fmtDate = useFormatDate();
   const save = useUpdateBookingNotes();
@@ -151,19 +152,22 @@ export function BookingDetailsDrawer({
             multiline
             minRows={3}
             value={notes}
-            onChange={(e) => {
-              setNotes(e.target.value);
-              if (save.isSuccess) save.reset();
-            }}
+            onChange={(e) => setNotes(e.target.value)}
             inputProps={{ maxLength: 2000 }}
           />
-          {save.isError && <Alert severity="error">{t('admin.details.notesError')}</Alert>}
-          {save.isSuccess && !dirty && <Alert severity="success">{t('admin.details.notesSaved')}</Alert>}
           <Box>
             <Button
               variant="contained"
               disabled={!dirty || save.isPending}
-              onClick={() => save.mutate({ id: booking.id, internalNotes: notes.trim() || null })}
+              onClick={() =>
+                save.mutate(
+                  { id: booking.id, internalNotes: notes.trim() || null },
+                  {
+                    onSuccess: () => toast.success(t('admin.details.notesSaved')),
+                    onError: () => toast.error(t('admin.details.notesError')),
+                  },
+                )
+              }
             >
               {save.isPending ? t('admin.settings.saving') : t('admin.details.saveNotes')}
             </Button>

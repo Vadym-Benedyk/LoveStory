@@ -326,6 +326,13 @@ export function BookingPage() {
                 <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
                 <span>{t('booking.form.consent')}</span>
               </label>
+              <Typography variant="body2" color="text.secondary">
+                {t('booking.form.termsHint')}
+                <RouterLink to="/terms" target="_blank" rel="noopener">
+                  {t('booking.form.termsLink')}
+                </RouterLink>
+                .
+              </Typography>
 
               {/* All validation messages live here once; fields only get a red outline. */}
               {showErrors && hasErrors && (
