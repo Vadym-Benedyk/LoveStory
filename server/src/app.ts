@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import pinoHttp from 'pino-http';
 import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
+import { UPLOADS_DIR, isLocalStorage } from './lib/storage.js';
 import { apiRouter } from './routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 
@@ -20,6 +21,23 @@ export function createApp(opts: { trustProxy?: number } = {}) {
       credentials: true,
     }),
   );
+
+  // Locally stored photos (STORAGE_DRIVER=local). Mounted before body parsing/logging: these are
+  // plain static files. File names are random UUIDs and never overwritten → cache for a year.
+  if (isLocalStorage) {
+    app.use(
+      '/uploads',
+      express.static(UPLOADS_DIR, {
+        index: false,
+        maxAge: '1y',
+        immutable: true,
+        // helmet's default `same-origin` would block the site (another origin when the API is
+        // hosted separately) from showing these public images.
+        setHeaders: (res) => res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'),
+      }),
+    );
+  }
+
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
   app.use(pinoHttp({ logger }));

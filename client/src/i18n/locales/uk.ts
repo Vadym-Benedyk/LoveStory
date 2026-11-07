@@ -23,7 +23,7 @@ export const uk: Record<string, string> = {
   'about.body':
     'Ізольований від урбанії, повна автономія на березі річки, це місце створене для того, щоб уповільнитися. Повна приватність, шум води і жодних думок, окрім відпочинку. Місце сили та єднання з природою.',
   // gallery
-  'gallery.title': 'Локація',
+  'gallery.title': 'Галерея',
   // amenities
   'amenities.title': 'Що робить його особливим',
   'amenity.fishing.title': 'Риболовля на річці',
@@ -249,15 +249,30 @@ export const uk: Record<string, string> = {
   'admin.gallery.empty': 'Поки немає фото. Завантажте, щоб наповнити галерею на сайті.',
   'admin.gallery.altText': 'Опис (alt)',
   'admin.gallery.category': 'Категорія',
-  'admin.gallery.hero': 'Головне фото',
   'admin.gallery.active': 'Показувати на сайті',
   'admin.gallery.moveUp': 'Перемістити вгору',
   'admin.gallery.moveDown': 'Перемістити вниз',
   'admin.gallery.delete': 'Видалити',
   'admin.gallery.deleteConfirm': 'Видалити це фото? Дію не можна скасувати.',
   'admin.gallery.uploadError': 'Не вдалося завантажити {name}.',
+  // 15 МБ = MAX_UPLOAD_BYTES у server/src/modules/media/media.routes.ts
+  'admin.gallery.tooLarge': 'Файл {name} завеликий (максимум 15 МБ).',
+  'admin.gallery.unsupportedType': 'Файл {name} не підтримується. Використайте JPEG, PNG, WebP, AVIF або HEIC.',
+  'admin.gallery.heicError': 'Не вдалося обробити HEIC-файл {name}. Експортуйте його як JPEG і завантажте ще раз.',
   'admin.gallery.storageNotConfigured':
-    'Сховище файлів ще не налаштовано. Вкажіть S3_BUCKET / S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY у server/.env і перезапустіть сервер.',
+    'Сховище S3 не налаштовано. Вкажіть S3_BUCKET / S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY у server/.env (або поставте STORAGE_DRIVER=local) і перезапустіть сервер.',
+  'admin.gallery.photosTitle': 'Фото галереї',
+  'admin.gallery.heroTitle': 'Головна заставка',
+  'admin.gallery.heroHint':
+    'Велике фото на початку сайту. Воно окреме від галереї й у ній не показується. Нове фото замінює поточне (старе видаляється). Поки заставку не задано, використовується стандартне зображення.',
+  'admin.gallery.heroDefault': 'Стандартне зображення',
+  'admin.gallery.heroUpload': 'Завантажити фото',
+  'admin.gallery.heroReplace': 'Замінити фото',
+  'admin.gallery.overlayLabel': 'Затемнення фото: {value}%',
+  'admin.gallery.overlayHint':
+    'Допомагає читати текст поверх фото. 0% — без затемнення, {standard}% — стандартне, 100% — найтемніше.',
+  'admin.gallery.overlayError': 'Не вдалося зберегти затемнення.',
+  'admin.gallery.heroRemove': 'Повернути стандартне',
   'admin.gallery.category.house': 'Дім',
   'admin.gallery.category.river': 'Річка',
   'admin.gallery.category.bbq': 'Барбекю',

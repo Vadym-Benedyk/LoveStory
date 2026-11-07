@@ -19,6 +19,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': { target: 'http://localhost:4000', changeOrigin: true },
+      // Photos uploaded from the admin (STORAGE_DRIVER=local) are served by the API.
+      '/uploads': { target: 'http://localhost:4000', changeOrigin: true },
     },
   },
   build: {

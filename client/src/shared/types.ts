@@ -60,6 +60,15 @@ export interface GalleryMedia {
   sortOrder: number;
 }
 
+// GET /gallery. The home-page splash and the gallery photos are kept apart: `hero` is the single
+// splash photo (null → built-in default image) and is never part of `photos`.
+// `heroOverlay` (0–100, 80 = standard) is how dark the layer over the splash is (see shared/hero.ts).
+export interface GalleryResponse {
+  hero: GalleryMedia | null;
+  photos: GalleryMedia[];
+  heroOverlay: number;
+}
+
 export type ReviewStatus = 'PENDING' | 'APPROVED' | 'HIDDEN';
 
 // Public shape (GET /reviews): approved only, no moderation fields.

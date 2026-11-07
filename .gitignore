@@ -21,6 +21,9 @@ server/prisma/*.db-shm
 # stray DB created outside prisma/ (see server/src/lib/sqlite-path.ts)
 server/*.db
 
+# photos uploaded from the admin (local storage driver)
+server/uploads/
+
 # logs
 *.log
 npm-debug.log*

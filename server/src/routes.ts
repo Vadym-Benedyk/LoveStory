@@ -21,7 +21,7 @@ apiRouter.use('/', publicBookingRouter); // /availability /quote /bookings
 apiRouter.use('/admin/auth', authRouter);
 apiRouter.use('/admin/bookings', adminBookingRouter);
 apiRouter.use('/admin/calendar', adminCalendarRouter); // /admin/calendar + /blocks
-apiRouter.use('/admin/media', adminMediaRouter); // /admin/media (+ /presign, /reorder, /:id)
+apiRouter.use('/admin/media', adminMediaRouter); // /admin/media (+ /upload, /reorder, /:id)
 apiRouter.use('/admin/pricing', adminPricingRouter); // /admin/pricing (+ /rules, /addons)
 apiRouter.use('/admin/reviews', adminReviewsRouter); // moderation: list, approve/hide/reply, delete
 apiRouter.use('/admin/settings', adminSettingsRouter); // property, contacts, map, notifications

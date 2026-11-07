@@ -1,27 +1,129 @@
 @use '@/styles/tokens' as t;
 
+// The hero is two layers: `.heroBg` (the photo and its darkening) and `.hero` (the text).
+// Plain layout (also for visitors who ask for reduced motion): the photo fills the box behind the
+// text, and everything scrolls together like an ordinary hero.
+.heroWrap {
+  position: relative;
+  // Until the photo has loaded: the site's own light background with dark text (the light text
+  // used over the photo would vanish on it). The photo then fades in over the background, and
+  // `.heroReady` (set by HomePage once it is in) switches to the light-on-photo look.
+  color: t.$bark;
+}
+
+.heroReady {
+  color: t.$cream;
+}
+
+.heroBg {
+  position: absolute;
+  inset: 0;
+  background: t.$sand;
+}
+
 .hero {
   position: relative;
+  z-index: 1; // text above the photo
   min-height: 100vh;
   display: grid;
   place-items: center;
   text-align: center;
-  color: t.$cream;
-  background:
-    linear-gradient(rgba(43, 38, 32, 0.35), rgba(43, 38, 32, 0.55)),
-    url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1600&q=70')
-      center/cover no-repeat;
 }
 
+// Parallax: the photo stays pinned behind the page while the text scrolls up with it and the
+// rest of the page (.pageBody) slides over the photo. Pure CSS, no scroll listeners.
+// `display: contents` drops the wrapper's own box, so the photo layer becomes a direct child of
+// <main> and can stay pinned for the whole page. A full-viewport pinned photo is safe on any
+// screen height, because only the photo is pinned: the text scrolls normally.
+@media (prefers-reduced-motion: no-preference) {
+  .heroWrap {
+    display: contents;
+  }
+
+  .heroBg {
+    position: sticky;
+    top: 0; // under the sticky header, which stays on top (higher z-index)
+    height: 100vh;
+    margin-bottom: -100vh; // the text (.hero) starts at the top of the photo, not below it
+    z-index: 0;
+  }
+
+  // The text rises faster than the page: useHeroTextParallax sets --hero-lift (a negative offset that
+  // grows with the scroll). A transform, so it never changes the layout.
+  .heroInner {
+    transform: translate3d(0, var(--hero-lift, 0px), 0);
+    will-change: transform;
+  }
+}
+
+// Opaque and above the pinned photo, so it covers the photo as it slides up.
+.pageBody {
+  position: relative;
+  z-index: 1;
+  background: t.$sand;
+}
+
+.heroImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0;
+  transition: opacity 1s ease-out;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.heroImageLoaded {
+  opacity: 1;
+}
+
+// Darkens the photo so the light headline stays readable. Painted over the image (DOM order).
+// The gradient itself is set inline: its strength is editable in the admin (see shared/hero.ts).
+// Hidden until the photo is in, so it doesn't tint the light background.
 .heroOverlay {
   position: absolute;
   inset: 0;
+  opacity: 0;
+  transition: opacity 1s ease-out;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }
 
+.heroReady .heroOverlay {
+  opacity: 1;
+}
+
+// The hero text is hidden until the photo and the site texts are in (see HomePage), so it appears
+// once, in its final wording and place — not as the built-in text that is then swapped for the one
+// edited in the admin (a different line count shifted the centred block). `visibility` also keeps
+// the not-yet-visible links out of the tab order.
 .heroInner {
   position: relative;
   z-index: 1;
   padding-block: 6rem;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 1s ease-out, visibility 0s linear 1s;
+}
+
+.heroInnerShown {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 1s ease-out, visibility 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroInner,
+  .heroInnerShown {
+    transition: none;
+  }
 }
 
 .heroTitle {

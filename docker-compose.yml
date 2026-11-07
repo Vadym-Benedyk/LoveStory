@@ -1,6 +1,6 @@
 # SQLite needs no database server, so there's nothing to run for the DB.
-# This file only provides optional local S3-compatible storage (MinIO) for gallery uploads.
-# You can skip it entirely until you wire up media uploads.
+# This file only provides optional local S3-compatible storage (MinIO) for trying
+# STORAGE_DRIVER=s3. Not needed with the default local storage (STORAGE_DRIVER=local).
 services:
   minio:
     image: minio/minio:latest

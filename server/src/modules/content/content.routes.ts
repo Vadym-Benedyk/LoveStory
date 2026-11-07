@@ -6,6 +6,7 @@ import { requireAuth, requireRole } from '../../middleware/auth.js';
 import { reviewSubmitLimiter } from '../../middleware/rate-limit.js';
 import { prisma } from '../../lib/prisma.js';
 import { toPublicSettings } from '../settings/settings.routes.js';
+import { readHeroOverlay } from '../media/hero-overlay.js';
 
 // Locales the site supports (kept in sync with client/src/i18n/translations.ts: Lang).
 const LOCALES = ['uk', 'en'] as const;
@@ -28,15 +29,21 @@ publicContentRouter.get(
   }),
 );
 
+// The home-page splash and the gallery are separate: `hero` is the single splash photo (or null),
+// `photos` are the gallery photos and never include it. `heroOverlay` (0–100, 80 = standard) is how dark the layer
+// over the splash is, sent with it so the photo and its darkening are applied together.
 publicContentRouter.get(
   '/gallery',
   asyncHandler(async (_req, res) => {
-    res.json(
-      await prisma.media.findMany({
-        where: { isActive: true },
+    const [hero, photos, heroOverlay] = await Promise.all([
+      prisma.media.findFirst({ where: { isActive: true, isHero: true } }),
+      prisma.media.findMany({
+        where: { isActive: true, isHero: false },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
       }),
-    );
+      readHeroOverlay(),
+    ]);
+    res.json({ hero, photos, heroOverlay });
   }),
 );
 

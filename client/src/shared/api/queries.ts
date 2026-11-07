@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './client';
 import { useLanguage } from '@/i18n/LanguageContext';
-import type { GalleryMedia, PublicReview, SiteContent, UnavailableRange } from '@/shared/types';
+import type { GalleryResponse, PublicReview, SiteContent, UnavailableRange } from '@/shared/types';
 
 // Editable site copy comes in the current site language (ContentBlock per locale).
 export const useSiteContent = () => {
@@ -64,7 +64,7 @@ export const useReviews = () =>
 export const useGallery = () =>
   useQuery({
     queryKey: ['gallery'],
-    queryFn: async () => (await api.get<GalleryMedia[]>('/gallery')).data,
+    queryFn: async () => (await api.get<GalleryResponse>('/gallery')).data,
   });
 
 export const useAvailability = (from: string, to: string) =>

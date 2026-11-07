@@ -9,7 +9,7 @@ panel with a **request → manual phone confirmation → calendar block** bookin
 
 - **Frontend:** React + Vite + TypeScript, MUI + SCSS Modules (`client/`)
 - **Backend:** Node.js + Express + TypeScript, Prisma + **SQLite** (`server/`)
-- **Storage:** S3-compatible (Cloudflare R2 / AWS S3 / MinIO locally) — optional, for gallery
+- **Photos:** uploaded from the admin (Gallery) to local disk by default (`server/uploads`); switch to S3-compatible storage (AWS S3 / Cloudflare R2 / MinIO) with `STORAGE_DRIVER=s3` — see `server/.env.example`
 - **Deploy:** single Docker image → any cheap Docker host (Railway / Render / VPS) with a persistent disk for the SQLite file
 
 ## Docs (read these first)
@@ -37,7 +37,8 @@ npm run dev
 # client → http://localhost:5173   api → http://localhost:4000
 # admin  → http://localhost:5173/admin
 
-# (optional) local S3 for gallery uploads:
+# Gallery uploads work out of the box (saved to server/uploads).
+# (optional) local S3 (MinIO) to try STORAGE_DRIVER=s3:
 # npm run storage:up
 ```
 
@@ -50,7 +51,7 @@ npm run dev
 client/   React + Vite + MUI + SCSS (public site + code-split admin bundle)
 server/   Express + Prisma API (domain modules); SQLite db at prisma/dev.db
 docs/     planning & design documentation
-docker-compose.yml   optional local MinIO (S3) for gallery uploads
+docker-compose.yml   optional local MinIO (S3) for trying STORAGE_DRIVER=s3
 ```
 
 ## Booking model (the one rule to remember)

@@ -213,40 +213,76 @@ function imageDimensions(file: File): Promise<{ width: number; height: number }>
   });
 }
 
-async function uploadMediaFile(file: File, category: MediaCategory): Promise<MediaItem> {
-  const { data: presigned } = await api.post<{ key: string; uploadUrl: string; publicUrl: string }>(
-    '/admin/media/presign',
-    { filename: file.name, contentType: file.type, category },
-  );
-  // Direct browser → S3 upload. Plain fetch (not the `api` axios instance): the presigned URL
-  // is a different origin and must not carry our auth cookie/header.
-  const put = await fetch(presigned.uploadUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': file.type },
-    body: file,
-  });
-  if (!put.ok) throw new Error(`Upload to storage failed (${put.status})`);
+// Thrown (as `error.code`) when a HEIC file can't be converted; the gallery shows a specific message.
+export const HEIC_CONVERT_FAILED = 'HEIC_CONVERT_FAILED';
 
+// Cheap check (no need to load the converter): HEIC/HEIF by MIME type or extension. Windows often
+// reports an empty type for .heic. A mislabelled file is still caught by the server's byte check.
+const isHeicFile = (f: File) => /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
+
+// Most browsers (everything but Safari) can't display HEIC, so it is converted before upload:
+// to WebP (smaller than JPEG), or to JPEG where the browser can't encode WebP (Safari silently
+// hands back a PNG then). The converter is a ~3 MB wasm bundle, loaded only when needed.
+async function convertHeic(file: File): Promise<File> {
+  try {
+    const { heicTo } = await import('heic-to');
+    let blob = await heicTo({ blob: file, type: 'image/webp', quality: 0.85 });
+    if (blob.type !== 'image/webp') blob = await heicTo({ blob: file, type: 'image/jpeg', quality: 0.9 });
+    const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
+    return new File([blob], `${file.name.replace(/\.[^./]+$/, '')}.${ext}`, { type: blob.type });
+  } catch (cause) {
+    throw Object.assign(new Error('HEIC conversion failed', { cause }), { code: HEIC_CONVERT_FAILED });
+  }
+}
+
+// The photo is the raw request body; the API checks it, stores it (local disk or S3, whichever the
+// server is configured for) and creates the Media row. `isHero` makes it the home-page splash.
+async function uploadMediaFile(original: File, category: MediaCategory, isHero = false): Promise<MediaItem> {
+  const file = isHeicFile(original) ? await convertHeic(original) : original;
   const dims = await imageDimensions(file).catch(() => null);
-  const { data: created } = await api.post<MediaItem>('/admin/media', {
-    storageKey: presigned.key,
-    url: presigned.publicUrl,
-    type: 'IMAGE',
-    altText: file.name.replace(/\.[^./]+$/, ''),
-    category,
-    width: dims?.width,
-    height: dims?.height,
+  const { data } = await api.post<MediaItem>('/admin/media/upload', file, {
+    headers: { 'Content-Type': file.type },
+    params: {
+      filename: file.name,
+      category,
+      isHero: isHero || undefined,
+      width: dims?.width,
+      height: dims?.height,
+    },
   });
-  return created;
+  return data;
+}
+
+// How dark the layer over the home-page splash photo is: 0–100 slider, 80 = the standard darkening.
+// One value for all languages.
+export const useHeroOverlay = () =>
+  useQuery({
+    queryKey: ['admin', 'hero-overlay'],
+    queryFn: async () => (await api.get<{ value: number }>('/admin/media/hero-overlay')).data.value,
+  });
+
+export function useSaveHeroOverlay() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (value: number) =>
+      (await api.put<{ value: number }>('/admin/media/hero-overlay', { value })).data.value,
+    onSuccess: (value) => {
+      qc.setQueryData(['admin', 'hero-overlay'], value);
+      qc.invalidateQueries({ queryKey: ['gallery'] }); // public splash (if cached in this tab)
+    },
+  });
 }
 
 export function useMediaActions() {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['admin', 'media'] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['admin', 'media'] });
+    qc.invalidateQueries({ queryKey: ['gallery'] }); // public gallery + hero (if cached in this tab)
+  };
 
   const upload = useMutation({
-    mutationFn: (vars: { file: File; category: MediaCategory }) =>
-      uploadMediaFile(vars.file, vars.category),
+    mutationFn: (vars: { file: File; category: MediaCategory; isHero?: boolean }) =>
+      uploadMediaFile(vars.file, vars.category, vars.isHero),
     onSuccess: invalidate,
   });
 

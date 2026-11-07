@@ -24,6 +24,15 @@ const schema = z.object({
   DEFAULT_CURRENCY: z.string().default('UAH'),
   TIMEZONE: z.string().default('UTC'),
 
+  // Where uploaded photos are stored. `local` = files on this server's disk, served at /uploads;
+  // `s3` = an S3-compatible bucket (needs the S3_* vars below). See src/lib/storage.ts.
+  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  // Local driver only. Absolute path in production (a persistent volume); default: server/uploads.
+  UPLOADS_DIR: z.string().optional(),
+  // Local driver only. Public base URL of the uploads when the site and the API are on different
+  // origins (e.g. https://api.example.com/uploads). Default: same-origin /uploads.
+  UPLOADS_PUBLIC_URL: z.string().optional(),
+
   S3_ENDPOINT: z.string().optional(),
   S3_REGION: z.string().default('auto'),
   S3_BUCKET: z.string().optional(),

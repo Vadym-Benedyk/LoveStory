@@ -358,7 +358,7 @@ Admin (JWT, role-guarded)
   CRUD /api/admin/pricing (rules, addons)
   CRUD /api/admin/promotions
   CRUD /api/admin/reviews (moderate)
-  CRUD /api/admin/media (upload via presigned S3, reorder, delete)
+  CRUD /api/admin/media (upload through the API → local disk or S3, reorder, delete)
   GET/PUT /api/admin/content
   GET/PUT /api/admin/settings
 ```
