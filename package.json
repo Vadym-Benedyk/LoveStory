@@ -26,6 +26,7 @@
     "migrate": "npm --workspace server run prisma:push",
     "seed": "npm --workspace server run prisma:seed",
     "admin:reset": "npm --workspace server run admin:reset --",
+    "media:thumbnails": "npm --workspace server run media:thumbnails --",
     "test": "npm --workspace server run test",
     "format": "prettier --write \"**/*.{ts,tsx,scss,json,md}\""
   },

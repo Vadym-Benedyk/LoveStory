@@ -216,6 +216,10 @@ function imageDimensions(file: File): Promise<{ width: number; height: number }>
 // Thrown (as `error.code`) when a HEIC file can't be converted; the gallery shows a specific message.
 export const HEIC_CONVERT_FAILED = 'HEIC_CONVERT_FAILED';
 
+// Largest photo the server accepts (it answers 413 above this).
+// Keep in sync with MAX_UPLOAD_BYTES in server/src/modules/media/media.routes.ts.
+export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+
 // Cheap check (no need to load the converter): HEIC/HEIF by MIME type or extension. Windows often
 // reports an empty type for .heic. A mislabelled file is still caught by the server's byte check.
 const isHeicFile = (f: File) => /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
@@ -235,10 +239,20 @@ async function convertHeic(file: File): Promise<File> {
   }
 }
 
+// Gets a picked file ready to be sent: HEIC/HEIF is converted, anything else is used as it is (the
+// server checks the real type). Done when the file is picked, so the page can preview it and report
+// a bad file at once; the upload itself only happens on Save.
+export const prepareImageFile = (file: File): Promise<File> => (isHeicFile(file) ? convertHeic(file) : Promise.resolve(file));
+
+// The alt text the server gives a new photo: its file name without the extension (same rule as in
+// server/src/modules/media/media.routes.ts). A photo whose alt text is edited before saving needs a
+// follow-up update only when it differs from this.
+export const defaultAltText = (filename: string) =>
+  filename.replace(/\.[^./]+$/, '').trim().slice(0, 300) || 'Photo';
+
 // The photo is the raw request body; the API checks it, stores it (local disk or S3, whichever the
 // server is configured for) and creates the Media row. `isHero` makes it the home-page splash.
-async function uploadMediaFile(original: File, category: MediaCategory, isHero = false): Promise<MediaItem> {
-  const file = isHeicFile(original) ? await convertHeic(original) : original;
+async function uploadMediaFile(file: File, category: MediaCategory, isHero = false): Promise<MediaItem> {
   const dims = await imageDimensions(file).catch(() => null);
   const { data } = await api.post<MediaItem>('/admin/media/upload', file, {
     headers: { 'Content-Type': file.type },
@@ -261,49 +275,165 @@ export const useHeroOverlay = () =>
     queryFn: async () => (await api.get<{ value: number }>('/admin/media/hero-overlay')).data.value,
   });
 
-export function useSaveHeroOverlay() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (value: number) =>
-      (await api.put<{ value: number }>('/admin/media/hero-overlay', { value })).data.value,
-    onSuccess: (value) => {
-      qc.setQueryData(['admin', 'hero-overlay'], value);
-      qc.invalidateQueries({ queryKey: ['gallery'] }); // public splash (if cached in this tab)
-    },
-  });
+// ---- Saving the gallery page ----
+// The gallery page collects every change locally and sends them all when "Save" is pressed: this
+// plan says what to send, and runGallerySave does it, step by step.
+export interface GallerySavePlan {
+  deleteIds: string[];
+  // The splash photo: leave it, delete it (back to the default image) or replace it with a new file.
+  hero: { kind: 'keep' } | { kind: 'remove'; id: string } | { kind: 'replace'; file: File };
+  // New gallery photos. `key` is a page-local id, used by `order`.
+  uploads: { key: string; file: File; category: MediaCategory; altText: string; isActive: boolean }[];
+  patches: { id: string; patch: Partial<Pick<MediaItem, 'category' | 'altText' | 'isActive'>> }[];
+  // Wanted order of the gallery photos that will exist afterwards (server ids and upload keys); null = untouched.
+  order: string[] | null;
+  overlay: number | null; // null = untouched
 }
 
-export function useMediaActions() {
-  const qc = useQueryClient();
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['admin', 'media'] });
-    qc.invalidateQueries({ queryKey: ['gallery'] }); // public gallery + hero (if cached in this tab)
+export interface GallerySaveFailure {
+  kind: 'delete' | 'hero' | 'upload' | 'patch' | 'order' | 'overlay';
+  name?: string; // file name, for uploads
+  error: unknown;
+}
+
+// What actually got saved, so the page can drop exactly that from its draft and keep the rest.
+export interface GallerySaveReport {
+  deleted: string[];
+  patched: string[];
+  uploaded: string[]; // upload keys
+  keyToId: Record<string, string>; // upload key → id of the new photo
+  heroDone: boolean;
+  orderDone: boolean;
+  overlayDone: boolean;
+  failures: GallerySaveFailure[];
+}
+
+async function runGallerySave(
+  plan: GallerySavePlan,
+  onProgress?: (done: number, total: number) => void,
+): Promise<GallerySaveReport> {
+  const report: GallerySaveReport = {
+    deleted: [],
+    patched: [],
+    uploaded: [],
+    keyToId: {},
+    heroDone: plan.hero.kind === 'keep',
+    orderDone: plan.order === null,
+    overlayDone: plan.overlay === null,
+    failures: [],
+  };
+  // A new photo with edited details needs one extra request after its upload.
+  const needsFollowUp = (u: GallerySavePlan['uploads'][number]) =>
+    u.altText !== defaultAltText(u.file.name) || !u.isActive;
+  const total =
+    plan.deleteIds.length +
+    (plan.hero.kind === 'keep' ? 0 : 1) +
+    plan.uploads.length +
+    plan.uploads.filter(needsFollowUp).length +
+    plan.patches.length +
+    (plan.order ? 1 : 0) +
+    (plan.overlay === null ? 0 : 1);
+  let done = 0;
+  // One step: a failure is recorded and the rest still runs, so one bad file doesn't lose the other changes.
+  const step = async (kind: GallerySaveFailure['kind'], run: () => Promise<void>, name?: string) => {
+    try {
+      await run();
+    } catch (error) {
+      report.failures.push({ kind, name, error });
+    }
+    onProgress?.(++done, total);
   };
 
-  const upload = useMutation({
-    mutationFn: (vars: { file: File; category: MediaCategory; isHero?: boolean }) =>
-      uploadMediaFile(vars.file, vars.category, vars.isHero),
-    onSuccess: invalidate,
-  });
+  for (const id of plan.deleteIds) {
+    await step('delete', async () => {
+      await api.delete(`/admin/media/${id}`);
+      report.deleted.push(id);
+    });
+  }
 
-  const update = useMutation({
-    mutationFn: async (vars: { id: string; patch: Partial<MediaItem> }) =>
-      (await api.patch<MediaItem>(`/admin/media/${vars.id}`, vars.patch)).data,
-    onSuccess: invalidate,
-  });
+  if (plan.hero.kind === 'remove') {
+    const { id } = plan.hero;
+    await step('hero', async () => {
+      await api.delete(`/admin/media/${id}`);
+      report.heroDone = true;
+    });
+  } else if (plan.hero.kind === 'replace') {
+    const { file } = plan.hero; // the server deletes the old splash when the new one arrives
+    await step(
+      'hero',
+      async () => {
+        await uploadMediaFile(file, 'OTHER', true);
+        report.heroDone = true;
+      },
+      file.name,
+    );
+  }
 
-  const remove = useMutation({
-    mutationFn: async (id: string) => (await api.delete(`/admin/media/${id}`)).data,
-    onSuccess: invalidate,
-  });
+  for (const u of plan.uploads) {
+    let created: MediaItem | null = null;
+    await step(
+      'upload',
+      async () => {
+        created = await uploadMediaFile(u.file, u.category);
+        report.uploaded.push(u.key);
+        report.keyToId[u.key] = created.id;
+      },
+      u.file.name,
+    );
+    if (created && needsFollowUp(u)) {
+      const { id } = created as MediaItem;
+      await step(
+        'patch',
+        async () => {
+          await api.patch(`/admin/media/${id}`, { altText: u.altText, ...(u.isActive ? {} : { isActive: false }) });
+        },
+        u.file.name,
+      );
+    }
+  }
 
-  const reorder = useMutation({
-    mutationFn: async (items: { id: string; sortOrder: number }[]) =>
-      (await api.post('/admin/media/reorder', { items })).data,
-    onSuccess: invalidate,
-  });
+  for (const p of plan.patches) {
+    await step('patch', async () => {
+      await api.patch(`/admin/media/${p.id}`, p.patch);
+      report.patched.push(p.id);
+    });
+  }
 
-  return { upload, update, remove, reorder };
+  if (plan.order) {
+    const uploadKeys = new Set(plan.uploads.map((u) => u.key));
+    // Upload keys become the new photos' ids; a photo whose upload failed has none and is left out.
+    const ids = plan.order.flatMap((k) => (uploadKeys.has(k) ? (report.keyToId[k] ? [report.keyToId[k]!] : []) : [k]));
+    await step('order', async () => {
+      if (ids.length) await api.post('/admin/media/reorder', { items: ids.map((id, i) => ({ id, sortOrder: i })) });
+      report.orderDone = true;
+    });
+  }
+
+  if (plan.overlay !== null) {
+    const value = plan.overlay;
+    await step('overlay', async () => {
+      await api.put('/admin/media/hero-overlay', { value });
+      report.overlayDone = true;
+    });
+  }
+
+  return report;
+}
+
+export function useSaveGallery() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { plan: GallerySavePlan; onProgress?: (done: number, total: number) => void }) =>
+      runGallerySave(vars.plan, vars.onProgress),
+    // Refetched before the mutation settles, so the page clears its draft only once the fresh data
+    // is in and never flashes the old state.
+    onSettled: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: ['admin', 'media'] }),
+        qc.invalidateQueries({ queryKey: ['admin', 'hero-overlay'] }),
+        qc.invalidateQueries({ queryKey: ['gallery'] }), // public gallery + splash (if cached in this tab)
+      ]),
+  });
 }
 
 // ---- Pricing (rules + add-ons) ----

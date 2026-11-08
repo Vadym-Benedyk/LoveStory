@@ -1,0 +1,9 @@
+@use '@/styles/tokens' as t;
+
+.page {
+  padding-block: t.$space-section;
+}
+
+.back {
+  margin-bottom: 1rem !important;
+}

@@ -4,11 +4,22 @@ import { z } from 'zod';
 import { asyncHandler } from '../../lib/async-handler.js';
 import { AppError } from '../../lib/errors.js';
 import { sniffImage } from '../../lib/image-type.js';
+import { logger } from '../../lib/logger.js';
+import { makeVariants, type ImageVariants } from '../../lib/image-variants.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
 import { prisma } from '../../lib/prisma.js';
 import { readHeroOverlay, writeHeroOverlay } from './hero-overlay.js';
-import { buildMediaKey, deleteObject, isStorageConfigured, publicUrlFor, putObject } from '../../lib/storage.js';
+import {
+  allKeysFor,
+  buildMediaKey,
+  deleteObject,
+  isStorageConfigured,
+  largeKeyFor,
+  publicUrlFor,
+  putObject,
+  thumbnailKeyFor,
+} from '../../lib/storage.js';
 
 const CATEGORIES = ['HOUSE', 'RIVER', 'BBQ', 'TUB', 'NATURE', 'OTHER'] as const;
 
@@ -91,10 +102,34 @@ adminMediaRouter.post(
       throw new AppError(415, 'Unsupported file. Upload a JPEG, PNG, WebP or AVIF image.', 'UNSUPPORTED_MEDIA_TYPE');
     }
 
-    const key = buildMediaKey(category, kind.ext);
-    await putObject(key, body, kind.mime);
-
+    // The lighter copies (made once, now) are also what proves the bytes really are a decodable image:
+    // sniffImage only looked at the first few, so a truncated or corrupt file would get through.
+    let variants: ImageVariants;
     try {
+      variants = await makeVariants(body);
+    } catch (err) {
+      logger.warn({ err, bytes: body.length }, 'Rejected upload: image could not be decoded');
+      throw new AppError(
+        415,
+        'This image could not be read, it may be damaged. Try another file.',
+        'UNSUPPORTED_MEDIA_TYPE',
+      );
+    }
+
+    const key = buildMediaKey(category, kind.ext);
+    const thumbKey = thumbnailKeyFor(key);
+    const largeKey = largeKeyFor(key);
+    const stored: string[] = [];
+    try {
+      await putObject(key, body, kind.mime);
+      stored.push(key);
+      await putObject(thumbKey, variants.thumbnail.data, 'image/webp');
+      stored.push(thumbKey);
+      if (variants.large) {
+        await putObject(largeKey, variants.large.data, 'image/webp');
+        stored.push(largeKey);
+      }
+
       let replacedKeys: string[] = [];
       const created = await prisma.$transaction(async (tx) => {
         if (isHero) {
@@ -107,8 +142,11 @@ adminMediaRouter.post(
         const last = await tx.media.findFirst({ orderBy: { sortOrder: 'desc' } });
         return tx.media.create({
           data: {
-            storageKey: key,
-            url: publicUrlFor(key),
+            storageKey: key, // the original, as uploaded
+            // What the site shows full-size (viewer, splash): the 2400 px copy, or the original itself when it
+            // is already small and light.
+            url: publicUrlFor(variants.large ? largeKey : key),
+            thumbnailUrl: publicUrlFor(thumbKey),
             type: 'IMAGE',
             // Alt text is required; start from the file name and let the admin refine it.
             altText: filename?.replace(/\.[^./]+$/, '').trim().slice(0, 300) || 'Photo',
@@ -120,12 +158,12 @@ adminMediaRouter.post(
           },
         });
       });
-      // Best-effort, like on delete: the replaced splash's file is no longer referenced.
-      await Promise.all(replacedKeys.map((k) => deleteObject(k).catch(() => null)));
+      // Best-effort, like on delete: the replaced splash's files (original + copies) are no longer referenced.
+      await Promise.all(replacedKeys.flatMap(allKeysFor).map((k) => deleteObject(k).catch(() => null)));
       res.status(201).json(created);
     } catch (err) {
-      // Don't leave an orphaned file behind if the row could not be saved.
-      await deleteObject(key).catch(() => null);
+      // Don't leave orphaned files behind if something above failed.
+      await Promise.all(stored.map((k) => deleteObject(k).catch(() => null)));
       throw err;
     }
   }),
@@ -173,9 +211,10 @@ adminMediaRouter.delete(
     const media = await prisma.media.findUnique({ where: { id } });
     if (!media) return res.status(404).json({ error: 'Not found' });
     await prisma.media.delete({ where: { id } });
-    // Best-effort: don't fail the request if the object is already gone from storage.
+    // Best-effort: don't fail the request if an object is already gone from storage. The copies go with the
+    // photo (older photos may lack some; deleting a missing file is harmless).
     if (isStorageConfigured()) {
-      await deleteObject(media.storageKey).catch(() => null);
+      await Promise.all(allKeysFor(media.storageKey).map((k) => deleteObject(k).catch(() => null)));
     }
     res.json({ ok: true });
   }),

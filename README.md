@@ -9,14 +9,15 @@ panel with a **request → manual phone confirmation → calendar block** bookin
 
 - **Frontend:** React + Vite + TypeScript, MUI + SCSS Modules (`client/`)
 - **Backend:** Node.js + Express + TypeScript, Prisma + **SQLite** (`server/`)
-- **Photos:** uploaded from the admin (Gallery) to local disk by default (`server/uploads`); switch to S3-compatible storage (AWS S3 / Cloudflare R2 / MinIO) with `STORAGE_DRIVER=s3` — see `server/.env.example`
-- **Deploy:** single Docker image → any cheap Docker host (Railway / Render / VPS) with a persistent disk for the SQLite file
+- **Photos:** uploaded from the admin (Gallery) to local disk by default (`server/uploads`); switch to S3-compatible storage (AWS S3 / Cloudflare R2 / MinIO) with `STORAGE_DRIVER=s3` — see `server/.env.example`. Every upload also gets a light 800 px WebP thumbnail for the site's grids (made with `sharp`); `npm run media:thumbnails` makes them for photos uploaded earlier
+- **Deploy:** single Docker image on an AWS Lightsail instance (persistent disk for the SQLite file); the site and photos on S3 + CloudFront — see [`docs/deployment-decision.md`](docs/deployment-decision.md)
 
 ## Docs (read these first)
 
 - [`docs/business-model.md`](docs/business-model.md) — concept, segments, revenue, requirements
 - [`docs/product-design.md`](docs/product-design.md) — sitemap, UX, UI, booking flow, admin workflow, data model
 - [`docs/project-development-plan.md`](docs/project-development-plan.md) — architecture, phases, backlog, estimates, risks, MVP
+- [`docs/deployment-decision.md`](docs/deployment-decision.md) — where it runs (Lightsail + S3/CloudFront), why, cost, exit path, known gaps before the first deploy
 
 ## Quickstart
 

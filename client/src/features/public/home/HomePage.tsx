@@ -9,6 +9,7 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
 import PlaceIcon from '@mui/icons-material/Place';
 import PetsIcon from '@mui/icons-material/Pets';
+import { PhotoGrid } from '../gallery/PhotoGrid';
 import { HeroImage } from './HeroImage';
 import { PricingSection } from './PricingSection';
 import { textStyle } from './textStyle';
@@ -22,6 +23,9 @@ import styles from './HomePage.module.scss';
 // The hero text waits for the photo, but never longer than this: on a slow connection readable
 // text is better than an empty hero.
 const HERO_TEXT_MAX_WAIT_MS = 3000;
+
+// The home page shows this many thumbnails; the rest are behind "All photos" (and in the viewer).
+const HOME_GALLERY_LIMIT = 6;
 
 export function HomePage() {
   const { data, isPending: contentPending } = useSiteContent();
@@ -143,29 +147,18 @@ export function HomePage() {
           <Typography variant="h2" gutterBottom>
             {t('gallery.title')}
           </Typography>
-          <Grid container spacing={2}>
-            {photos.length > 0
-              ? photos.map((photo, i) => (
-                  <Grid key={photo.id} item xs={6} md={4}>
-                    <button
-                      type="button"
-                      className={styles.galleryTile}
-                      style={{ backgroundImage: `url(${photo.url})` }}
-                      onClick={() => setLightboxIndex(i)}
-                      aria-label={photo.altText}
-                    />
-                  </Grid>
-                ))
-              : Array.from({ length: 6 }).map((_, i) => (
-                  <Grid key={i} item xs={6} md={4}>
-                    <div className={styles.galleryTile} aria-hidden />
-                  </Grid>
-                ))}
-          </Grid>
+          <PhotoGrid photos={photos} limit={HOME_GALLERY_LIMIT} placeholders={6} onOpen={setLightboxIndex} />
+          {photos.length > HOME_GALLERY_LIMIT && (
+            <Box sx={{ mt: 3, textAlign: 'center' }}>
+              <Button variant="outlined" size="large" component={RouterLink} to="/gallery">
+                {t('gallery.all', { n: photos.length })}
+              </Button>
+            </Box>
+          )}
         </Container>
 
         <Lightbox
-          images={photos.map((p) => ({ url: p.url, alt: p.altText }))}
+          images={photos.map((p) => ({ url: p.url, alt: p.altText, thumbnailUrl: p.thumbnailUrl }))}
           index={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onChange={setLightboxIndex}

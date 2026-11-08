@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { env } from '../config/env.js';
 
 // Photo storage behind one small interface — putObject / deleteObject / publicUrlFor — with two
@@ -54,6 +54,15 @@ export function buildMediaKey(category: string, ext: string): string {
   return `gallery/${safeCategory}/${randomUUID()}.${ext}`;
 }
 
+// A photo's thumbnail lives next to it and is named after it: `gallery/house/<id>.jpg` →
+// `gallery/house/<id>-thumb.webp`. So it can always be found from the photo's key (to delete it
+// together with the photo) and nothing extra needs to be stored.
+export const thumbnailKeyFor = (key: string) => `${key.replace(/\.[^./]+$/, '')}-thumb.webp`;
+// The large copy (the full-screen viewer's image) sits next to it the same way: `<id>-large.webp`.
+export const largeKeyFor = (key: string) => `${key.replace(/\.[^./]+$/, '')}-large.webp`;
+// Every file that belongs to a photo, to delete them together (some may not exist: that is harmless).
+export const allKeysFor = (key: string) => [key, thumbnailKeyFor(key), largeKeyFor(key)];
+
 // Resolve a key to a file inside UPLOADS_DIR (keys are server-generated; this is defence in depth).
 function localPath(key: string): string {
   const full = path.resolve(UPLOADS_DIR, key);
@@ -85,6 +94,12 @@ export async function putObject(key: string, body: Buffer, contentType: string):
       CacheControl: 'public, max-age=31536000, immutable',
     }),
   );
+}
+
+export async function readObject(key: string): Promise<Buffer> {
+  if (isLocalStorage) return fs.readFile(localPath(key));
+  const res = await s3().send(new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: key }));
+  return Buffer.from(await res.Body!.transformToByteArray());
 }
 
 export async function deleteObject(key: string): Promise<void> {

@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider, CssBaseline, StyledEngineProvider } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import '@fontsource/cormorant-garamond/600.css';
 import '@fontsource/inter/400.css';
 import '@fontsource/inter/600.css';
@@ -17,6 +17,11 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 60_000, refetchOnWindowFocus: false } },
 });
 
+// A "data router" (instead of <BrowserRouter>) is what makes useBlocker available, used to warn about
+// unsaved changes (admin Gallery). The whole route tree stays in App.tsx: it is mounted under one
+// catch-all route and its <Routes> work exactly as before.
+const router = createBrowserRouter([{ path: '*', element: <App /> }]);
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     {/* MUI's (emotion) styles go first in <head>, so our SCSS modules — loaded earlier by Vite —
@@ -30,9 +35,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <LanguageProvider>
             <DateLocaleProvider>
               <ToastProvider>
-                <BrowserRouter>
-                  <App />
-                </BrowserRouter>
+                <RouterProvider router={router} />
               </ToastProvider>
             </DateLocaleProvider>
           </LanguageProvider>

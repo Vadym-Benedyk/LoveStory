@@ -2,9 +2,10 @@
 // stored under UPLOADS_DIR, served at /uploads, and shows up on the public /gallery.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { sniffImage } from '../src/lib/image-type.js';
-import { UPLOADS_DIR } from '../src/lib/storage.js';
+import { allKeysFor, largeKeyFor, thumbnailKeyFor, UPLOADS_DIR } from '../src/lib/storage.js';
 import { MAX_UPLOAD_BYTES } from '../src/modules/media/media.routes.js';
 import { call, createUser, prisma, resetDb, startServer, type TestServer } from './helpers.js';
 
@@ -13,14 +14,32 @@ let owner: string;
 let editor: string;
 let manager: string;
 
-// Smallest valid files; only the header matters to the server, but the PNG is a real image.
+// A real 1×1 PNG, plus header-only stand-ins for the other formats: enough for sniffImage, but NOT for
+// an upload, which also has to decode (so the thumbnail can be made). Real JPEG / WebP / AVIF
+// fixtures for uploads are generated with sharp in beforeAll.
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
   'base64',
 );
-const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00]);
-const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.from([0, 0, 0, 0]), Buffer.from('WEBPVP8 ')]);
-const AVIF = Buffer.concat([Buffer.from([0, 0, 0, 0x1c]), Buffer.from('ftypavif'), Buffer.alloc(8)]);
+const FAKE_JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00]);
+const FAKE_WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.from([0, 0, 0, 0]), Buffer.from('WEBPVP8 ')]);
+const FAKE_AVIF = Buffer.concat([Buffer.from([0, 0, 0, 0x1c]), Buffer.from('ftypavif'), Buffer.alloc(8)]);
+
+let JPEG: Buffer;
+let WEBP: Buffer;
+let AVIF: Buffer;
+
+// A flat-colour picture of the given size (cheap), or one full of noise (like a real photo: big file).
+const blank = (width: number, height: number, noisy = false) =>
+  sharp({
+    create: {
+      width,
+      height,
+      channels: 3,
+      background: { r: 60, g: 120, b: 90 },
+      ...(noisy ? { noise: { type: 'gaussian' as const, mean: 128, sigma: 40 } } : {}),
+    },
+  });
 
 const origin = () => srv.url.replace(/\/api$/, '');
 
@@ -39,7 +58,14 @@ function upload(
 const uploadOk = async (body: Buffer, query: Record<string, string> = {}, type = 'image/png') => {
   const res = await upload(owner, body, { type, query });
   expect(res.status).toBe(201);
-  return (await res.json()) as { id: string; storageKey: string; url: string; sortOrder: number; isHero: boolean };
+  return (await res.json()) as {
+    id: string;
+    storageKey: string;
+    url: string;
+    thumbnailUrl: string;
+    sortOrder: number;
+    isHero: boolean;
+  };
 };
 
 // The splash darkening slider: 80 is the standard look and the default, 100 the darkest.
@@ -53,6 +79,9 @@ const exists = (key: string) =>
 
 beforeAll(async () => {
   srv = await startServer();
+  JPEG = await blank(64, 48).jpeg().toBuffer();
+  WEBP = await blank(64, 48).webp().toBuffer();
+  AVIF = await blank(64, 48).avif().toBuffer();
 });
 afterAll(async () => {
   await srv.close();
@@ -69,9 +98,9 @@ beforeEach(async () => {
 describe('sniffImage', () => {
   it('recognises the supported formats by their bytes', () => {
     expect(sniffImage(PNG)).toEqual({ ext: 'png', mime: 'image/png' });
-    expect(sniffImage(JPEG)).toEqual({ ext: 'jpg', mime: 'image/jpeg' });
-    expect(sniffImage(WEBP)).toEqual({ ext: 'webp', mime: 'image/webp' });
-    expect(sniffImage(AVIF)).toEqual({ ext: 'avif', mime: 'image/avif' });
+    expect(sniffImage(FAKE_JPEG)).toEqual({ ext: 'jpg', mime: 'image/jpeg' });
+    expect(sniffImage(FAKE_WEBP)).toEqual({ ext: 'webp', mime: 'image/webp' });
+    expect(sniffImage(FAKE_AVIF)).toEqual({ ext: 'avif', mime: 'image/avif' });
   });
 
   it('rejects everything else, including SVG and HTML', () => {
@@ -110,6 +139,17 @@ describe('POST /admin/media/upload', () => {
     expect(pub.hero).toBeNull();
   });
 
+  it.each([
+    ['JPEG', () => JPEG, 'image/jpeg', 'jpg'],
+    ['PNG', () => PNG, 'image/png', 'png'],
+    ['WebP', () => WEBP, 'image/webp', 'webp'],
+    ['AVIF', () => AVIF, 'image/avif', 'avif'],
+  ])('accepts %s', async (_name, bytes, type, ext) => {
+    const m = await uploadOk(bytes(), {}, type);
+    expect(m.storageKey).toMatch(new RegExp(`\\.${ext}$`));
+    expect(m.thumbnailUrl).toMatch(/-thumb\.webp$/);
+  });
+
   it('appends new photos at the end of the gallery', async () => {
     const a = await uploadOk(PNG);
     const b = await uploadOk(JPEG, {}, 'image/jpeg');
@@ -120,11 +160,14 @@ describe('POST /admin/media/upload', () => {
   it('refuses files that are not supported images and stores nothing', async () => {
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
     const html = Buffer.from('<html>not an image</html>');
+    const photo = await blank(400, 300, true).jpeg().toBuffer();
     const cases: [Buffer, string][] = [
       [svg, 'image/svg+xml'], // right content type family, wrong bytes
       [html, 'image/png'], // lying content type
       [PNG, 'text/plain'], // real image, but not announced as one
       [Buffer.alloc(0), 'image/png'],
+      [FAKE_JPEG, 'image/jpeg'], // starts like a JPEG, but there is no image in it
+      [photo.subarray(0, Math.floor(photo.length * 0.4)), 'image/jpeg'], // a real JPEG cut short
     ];
     for (const [body, type] of cases) {
       const res = await upload(owner, body, { type });
@@ -147,6 +190,157 @@ describe('POST /admin/media/upload', () => {
     expect((await upload(owner, PNG, { query: { category: 'NOPE' } })).status).toBe(400);
     expect((await upload(owner, PNG, { query: { width: '-5' } })).status).toBe(400);
     expect(await prisma.media.count()).toBe(0);
+  });
+});
+
+describe('thumbnails', () => {
+  const thumbOf = async (m: { storageKey: string }) => fs.readFile(path.join(UPLOADS_DIR, thumbnailKeyFor(m.storageKey)));
+
+  it('names a photo\'s thumbnail after it', () => {
+    expect(thumbnailKeyFor('gallery/house/abc.jpg')).toBe('gallery/house/abc-thumb.webp');
+    expect(thumbnailKeyFor('gallery/other/x.y.webp')).toBe('gallery/other/x.y-thumb.webp');
+    expect(thumbnailKeyFor('noext')).toBe('noext-thumb.webp');
+    expect(largeKeyFor('gallery/house/abc.jpg')).toBe('gallery/house/abc-large.webp');
+    expect(allKeysFor('gallery/house/abc.jpg')).toEqual([
+      'gallery/house/abc.jpg',
+      'gallery/house/abc-thumb.webp',
+      'gallery/house/abc-large.webp',
+    ]);
+  });
+
+  it('makes a small WebP next to the photo, serves it, and exposes it on the public gallery', async () => {
+    const original = await blank(1600, 1200, true).jpeg({ quality: 90 }).toBuffer();
+    const m = await uploadOk(original, { category: 'RIVER' }, 'image/jpeg');
+
+    expect(m.thumbnailUrl).toBe(`/uploads/${thumbnailKeyFor(m.storageKey)}`);
+    expect(m.thumbnailUrl).toMatch(/^\/uploads\/gallery\/river\/[0-9a-f-]{36}-thumb\.webp$/);
+
+    const bytes = await thumbOf(m);
+    expect(await sharp(bytes).metadata()).toMatchObject({ format: 'webp', width: 800, height: 600 }); // fitted inside 800×800
+    expect(bytes.length).toBeLessThan(original.length / 4); // the point of it: far lighter than the photo
+
+    const served = await fetch(origin() + m.thumbnailUrl);
+    expect(served.status).toBe(200);
+    expect(served.headers.get('content-type')).toBe('image/webp');
+    expect(await fs.readFile(path.join(UPLOADS_DIR, m.storageKey))).toEqual(original); // the original is untouched
+
+    const pub = (await call(srv, 'GET', '/gallery')).body;
+    expect(pub.photos[0]).toMatchObject({ url: m.url, thumbnailUrl: m.thumbnailUrl });
+  });
+
+  it('never enlarges a small picture', async () => {
+    const m = await uploadOk(PNG);
+    expect(await sharp(await thumbOf(m)).metadata()).toMatchObject({ width: 1, height: 1 });
+  });
+
+  it('applies the EXIF orientation and drops the metadata', async () => {
+    // 1200×800 pixels flagged "rotate 90°": it is shown as a 800×1200 portrait.
+    const rotated = await blank(1200, 800).jpeg().withMetadata({ orientation: 6 }).toBuffer();
+    expect((await sharp(rotated).metadata()).orientation).toBe(6);
+
+    const m = await uploadOk(rotated, {}, 'image/jpeg');
+    const meta = await sharp(await thumbOf(m)).metadata();
+    expect(meta.height).toBe(800);
+    expect(meta.width).toBeLessThan(meta.height!); // portrait, as the photo is meant to be seen
+    expect(meta.exif).toBeUndefined(); // no EXIF (so no GPS location) in the thumbnail
+  });
+
+  it('is deleted together with the photo, and with a replaced splash', async () => {
+    const photo = await uploadOk(JPEG, {}, 'image/jpeg');
+    const first = await uploadOk(JPEG, { isHero: 'true' }, 'image/jpeg');
+    const second = await uploadOk(WEBP, { isHero: 'true' }, 'image/webp');
+
+    // replacing the splash removed the old splash's photo and thumbnail
+    expect(await exists(first.storageKey)).toBe(false);
+    expect(await exists(thumbnailKeyFor(first.storageKey))).toBe(false);
+    expect(await exists(second.storageKey)).toBe(true);
+    expect(await exists(thumbnailKeyFor(second.storageKey))).toBe(true);
+
+    expect((await call(srv, 'DELETE', `/admin/media/${photo.id}`, { token: owner })).status).toBe(200);
+    expect(await exists(photo.storageKey)).toBe(false);
+    expect(await exists(thumbnailKeyFor(photo.storageKey))).toBe(false);
+  });
+
+  it('a photo from before thumbnails existed still deletes cleanly', async () => {
+    const photo = await uploadOk(JPEG, {}, 'image/jpeg');
+    await fs.rm(path.join(UPLOADS_DIR, thumbnailKeyFor(photo.storageKey))); // as if it never had one
+    await prisma.media.update({ where: { id: photo.id }, data: { thumbnailUrl: null } });
+    expect((await call(srv, 'DELETE', `/admin/media/${photo.id}`, { token: owner })).status).toBe(200);
+    expect(await exists(photo.storageKey)).toBe(false);
+  });
+});
+
+describe('large copy (the image of the full-screen viewer and the splash)', () => {
+  let BIG: Buffer; // 2600×1950: wider than the 2400 px limit
+  beforeAll(async () => {
+    BIG = await blank(2600, 1950, true).jpeg({ quality: 90 }).toBuffer();
+  });
+  const fileOf = (key: string) => fs.readFile(path.join(UPLOADS_DIR, key));
+
+  it('a photo over 2400 px gets a 2400 px WebP, which becomes its url; the original is kept', async () => {
+    const m = await uploadOk(BIG, { category: 'HOUSE' }, 'image/jpeg');
+
+    expect(m.storageKey).toMatch(/^gallery\/house\/[0-9a-f-]{36}\.jpg$/); // the original
+    expect(m.url).toBe(`/uploads/${largeKeyFor(m.storageKey)}`);
+    expect(m.url).toMatch(/-large\.webp$/);
+
+    const large = await fileOf(largeKeyFor(m.storageKey));
+    expect(await sharp(large).metadata()).toMatchObject({ format: 'webp', width: 2400, height: 1800 });
+    expect(large.length).toBeLessThan(BIG.length);
+    expect(await fileOf(m.storageKey)).toEqual(BIG); // the original is untouched
+
+    const served = await fetch(origin() + m.url);
+    expect(served.status).toBe(200);
+    expect(served.headers.get('content-type')).toBe('image/webp');
+
+    const pub = (await call(srv, 'GET', '/gallery')).body;
+    expect(pub.photos[0]).toMatchObject({ url: m.url, thumbnailUrl: m.thumbnailUrl });
+  });
+
+  it('a small, light photo gets no large copy: its url is the original', async () => {
+    const m = await uploadOk(JPEG, {}, 'image/jpeg');
+    expect(m.url).toBe(`/uploads/${m.storageKey}`);
+    expect(await exists(largeKeyFor(m.storageKey))).toBe(false);
+  });
+
+  it('a photo that is small in pixels but over 1 MB still gets a lighter copy, at its own size', async () => {
+    const heavy = await blank(1500, 1000, true).jpeg({ quality: 100 }).toBuffer();
+    expect(heavy.length).toBeGreaterThan(1024 * 1024); // the fixture really is heavy
+
+    const m = await uploadOk(heavy, {}, 'image/jpeg');
+    expect(m.url).toMatch(/-large\.webp$/);
+    const large = await fileOf(largeKeyFor(m.storageKey));
+    expect(await sharp(large).metadata()).toMatchObject({ width: 1500, height: 1000 }); // not enlarged, not shrunk
+    expect(large.length).toBeLessThan(heavy.length);
+  });
+
+  it('applies the EXIF orientation to the large copy too', async () => {
+    // 2600×1700 pixels flagged "rotate 90°": shown as a 1700×2600 portrait → 1569×2400.
+    const rotated = await blank(2600, 1700, true).jpeg({ quality: 85 }).withMetadata({ orientation: 6 }).toBuffer();
+    const m = await uploadOk(rotated, {}, 'image/jpeg');
+    const meta = await sharp(await fileOf(largeKeyFor(m.storageKey))).metadata();
+    expect(meta.height).toBe(2400);
+    expect(meta.width).toBeLessThan(meta.height!);
+    expect(meta.exif).toBeUndefined();
+  });
+
+  it('the splash gets one too, so the home page background is light', async () => {
+    const hero = await uploadOk(BIG, { isHero: 'true' }, 'image/jpeg');
+    expect(hero.url).toMatch(/-large\.webp$/);
+    expect((await call(srv, 'GET', '/gallery')).body.hero.url).toBe(hero.url);
+  });
+
+  it('all three files go when the photo is deleted or the splash is replaced', async () => {
+    const photo = await uploadOk(BIG, {}, 'image/jpeg');
+    const first = await uploadOk(BIG, { isHero: 'true' }, 'image/jpeg');
+    const second = await uploadOk(JPEG, { isHero: 'true' }, 'image/jpeg');
+
+    for (const key of allKeysFor(first.storageKey)) expect(await exists(key)).toBe(false); // old splash
+    expect(await exists(second.storageKey)).toBe(true);
+
+    for (const key of allKeysFor(photo.storageKey)) expect(await exists(key)).toBe(true);
+    expect((await call(srv, 'DELETE', `/admin/media/${photo.id}`, { token: owner })).status).toBe(200);
+    for (const key of allKeysFor(photo.storageKey)) expect(await exists(key)).toBe(false);
   });
 });
 

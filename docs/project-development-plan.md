@@ -24,7 +24,7 @@ deliberately rough (±30%). Convert to story points at your team's velocity if y
 | ORM/DB | **Prisma + PostgreSQL** | Postgres for transactional date-range integrity (`btree_gist` exclusion constraint). |
 | Auth | **JWT (access) + httpOnly refresh cookie**, bcrypt | Role-based, server-enforced. |
 | Validation | **Zod** | Shared schemas, every endpoint + forms. |
-| Media | **S3-compatible object storage** | AWS S3 **or** Cloudflare R2 / Backblaze B2 / MinIO — presigned uploads. |
+| Media | **S3-compatible object storage** | AWS S3 **or** Cloudflare R2 / Backblaze B2 / MinIO. Uploads go through the API (validated, thumbnails via `sharp`); see [`deployment-decision.md`](deployment-decision.md). |
 | Email/notify | Transactional email (Resend/Postmark/SES) + optional Telegram/SMS | Admin new-request alerts. |
 
 ### Why a modular monolith (not serverless, not microservices)
@@ -37,6 +37,10 @@ Express app with clear internal **domain modules** (`booking`, `pricing`, `media
 needs to scale out, the seams are already there.
 
 ### Deployment (cheap & portable — not tied to any cloud)
+
+> **Decision (2026-11-08):** API + SQLite on an AWS Lightsail instance, site and photos on
+> S3 + CloudFront — see [`deployment-decision.md`](deployment-decision.md). The options below are the
+> original comparison, kept for reference.
 
 The whole backend is a single **Docker image**, so deploy to whatever is cheapest:
 
@@ -301,7 +305,7 @@ P1 ─▶ P2 ─▶ P4 ─┐
 - `GET/PUT /admin/content`; cache invalidation on save
 
 **T7.2 Media library** — *deps: T5.2, S3 config* — **12–16h**
-- presigned S3/R2 upload (direct from browser), thumbnail generation
+- upload through the API (validated; no presigned URLs), server-side thumbnail generation with `sharp` — see [`deployment-decision.md`](deployment-decision.md)
 - grid manage: category, alt text (required for images), reorder (drag), hero flag, video flag, delete
 - `CRUD /admin/media`; safe file-type/size validation
 

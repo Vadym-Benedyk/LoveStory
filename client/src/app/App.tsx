@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { CircularProgress, Box } from '@mui/material';
 import { PublicLayout } from '@/features/public/PublicLayout';
 import { HomePage } from '@/features/public/home/HomePage';
+import { AllPhotosPage } from '@/features/public/gallery/AllPhotosPage';
 import { BookingPage } from '@/features/public/booking/BookingPage';
 import { TermsPage } from '@/features/public/terms/TermsPage';
 
@@ -27,6 +28,7 @@ export function App() {
     <Routes>
       <Route element={<PublicLayout />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/gallery" element={<AllPhotosPage />} />
         <Route path="/booking" element={<BookingRoute />} />
         <Route path="/terms" element={<TermsPage />} />
       </Route>

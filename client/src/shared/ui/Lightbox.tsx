@@ -1,83 +1,34 @@
-import { useEffect } from 'react';
-import { Box, Dialog, IconButton } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import { lazy, Suspense, useRef } from 'react';
 
 export interface LightboxImage {
-  url: string;
+  url: string; // the full photo, shown in the viewer
   alt: string;
+  thumbnailUrl?: string | null; // a light preview for the thumbnail strip (older photos have none)
 }
 
 interface Props {
   images: LightboxImage[];
-  index: number | null;
+  index: number | null; // null = closed
   onClose: () => void;
   onChange: (index: number) => void;
 }
 
-export function Lightbox({ images, index, onClose, onChange }: Props) {
-  const open = index !== null;
-  const current = index !== null ? images[index] : undefined;
+// The viewer (swipe, zoom, fullscreen, thumbnails: ~20 KB gzipped) is a separate chunk, so visitors who
+// never open a photo never download it. Call preloadPhotoViewer() on hover / touch to warm it up.
+const loadViewer = () => import('./PhotoViewer');
+const PhotoViewer = lazy(loadViewer);
+export const preloadPhotoViewer = () => {
+  void loadViewer();
+};
 
-  const prev = () => index !== null && onChange((index - 1 + images.length) % images.length);
-  const next = () => index !== null && onChange((index + 1) % images.length);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowLeft') prev();
-      if (e.key === 'ArrowRight') next();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, index]);
-
-  if (!current) return null;
-
+// Once opened it stays mounted (closed), so the close animation can play.
+export function Lightbox(props: Props) {
+  const opened = useRef(false);
+  if (props.index !== null) opened.current = true;
+  if (!opened.current) return null;
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="lg"
-      fullWidth
-      slotProps={{ paper: { sx: { bgcolor: 'rgba(20,18,15,0.97)', boxShadow: 'none' } } }}
-    >
-      <Box sx={{ position: 'relative', display: 'grid', placeItems: 'center', minHeight: '70vh', p: 1 }}>
-        <IconButton
-          aria-label="Close"
-          onClick={onClose}
-          sx={{ position: 'absolute', top: 8, right: 8, color: '#fff', zIndex: 1 }}
-        >
-          <CloseIcon />
-        </IconButton>
-        {images.length > 1 && (
-          <IconButton
-            aria-label="Previous image"
-            onClick={prev}
-            sx={{ position: 'absolute', left: 8, color: '#fff', zIndex: 1 }}
-          >
-            <ArrowBackIosNewIcon />
-          </IconButton>
-        )}
-        <Box
-          component="img"
-          src={current.url}
-          alt={current.alt}
-          sx={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: 1 }}
-        />
-        {images.length > 1 && (
-          <IconButton
-            aria-label="Next image"
-            onClick={next}
-            sx={{ position: 'absolute', right: 8, color: '#fff', zIndex: 1 }}
-          >
-            <ArrowForwardIosIcon />
-          </IconButton>
-        )}
-      </Box>
-    </Dialog>
+    <Suspense fallback={null}>
+      <PhotoViewer {...props} />
+    </Suspense>
   );
 }
