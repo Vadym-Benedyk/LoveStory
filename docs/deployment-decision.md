@@ -31,14 +31,16 @@ Wiring:
   (used for links in notifications, `lib/notify.ts`).
 - Build the client with `VITE_API_BASE=https://api.<domain>/api` (inlined at build time).
 - `TRUST_PROXY=1` (Caddy is the only proxy; the default `0` would make rate limiting see Caddy's IP).
-- Backups: Lightsail automatic daily snapshots (7 kept) **plus** a nightly `sqlite3 .backup` to S3.
-  Test a restore on a clean machine once.
+- Backups: Lightsail automatic daily snapshots (7 kept) **plus** a nightly dump with
+  `deploy/backup.sh` (SQLite online backup, integrity check, last 7 kept on the server, optional upload
+  to S3). Test a restore on a clean machine once.
 - S3 access: an IAM user limited to the media bucket, keys in the server's `.env`. Lightsail instance
   IAM roles are reported as unavailable (community answer, not confirmed in the official docs).
-- Release: build the image (commands in the header of `server/Dockerfile`; it builds for both
-  `linux/amd64` and `linux/arm64`), push it to a registry, `docker compose pull && up -d`. On the first
-  run and after schema changes, run the `tools` image first (`prisma:push`, and `prisma:seed` once).
-  The API is down for a few seconds during a redeploy (single SQLite writer); the static site stays up.
+- Release: `git pull`, `docker compose build`, `prisma:push` through the `tools` service, `docker
+  compose up -d` (or build elsewhere and pull, with `API_IMAGE`). Runbook:
+  [`deploy/README.md`](../deploy/README.md). The image builds for both `linux/amd64` and
+  `linux/arm64`. The API is down for a few seconds during a redeploy (single SQLite writer); the
+  static site stays up.
 
 ## Photo processing: on the API with `sharp`, not Lambda
 
@@ -104,9 +106,20 @@ served; `SIGTERM` shuts the server down cleanly; the data is still there after a
 The amd64 image builds too and its native modules (better-sqlite3, sharp) load, but amd64 was only run
 under emulation and not through the full test above.
 
+Production stack, in `deploy/` (runbook in `deploy/README.md`): `docker-compose.yml` (Caddy, the API,
+and a `tools` service for one-off jobs), `Caddyfile` (HTTPS for `api.<domain>`), `.env.example` and
+`backup.sh`. Checked locally with `DOMAIN=localhost` (Caddy's internal CA instead of Let's Encrypt):
+schema push and seed through `tools`, `up --wait` (the API reports healthy within seconds, then Caddy
+starts), HTTPS and the HTTP redirect, owner login through Caddy (the refresh cookie is
+`HttpOnly; Secure; SameSite=Lax`), a photo upload through Caddy, and `backup.sh` on the live database
+(plus pruning, the upload command with a stand-in `aws`, and a restore).
+
+Not tested: a real Let's Encrypt certificate (needs the public DNS record), the S3 driver in this
+stack (the test used local storage), Lightsail itself, and `TRUST_PROXY=1` behind Caddy (configuration
+only).
+
 Still open:
 
-- No production Compose file, Caddyfile or backup script in the repo yet (the layout is described above).
 - The runtime image is about 1.2 GB (`docker images`). `@prisma/client` 7.8 pulls the `prisma` CLI,
   with its Studio and TypeScript dependencies, into `node_modules` (407 MB in total). It works; trim
   it later if pulls feel slow.

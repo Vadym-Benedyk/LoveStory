@@ -24,6 +24,10 @@ server/*.db
 # photos uploaded from the admin (local storage driver)
 server/uploads/
 
+# production data on the server (SQLite file, database backups); see deploy/
+deploy/data/
+deploy/backups/
+
 # logs
 *.log
 npm-debug.log*

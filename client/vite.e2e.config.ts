@@ -1,0 +1,11 @@
+import base from './vite.config';
+export default {
+  ...base,
+  server: {
+    port: 5174,
+    proxy: {
+      '/api': { target: 'http://localhost:4100', changeOrigin: true },
+      '/uploads': { target: 'http://localhost:4100', changeOrigin: true },
+    },
+  },
+};

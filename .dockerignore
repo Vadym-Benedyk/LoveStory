@@ -4,6 +4,7 @@
 **/dist
 .git
 docs
+deploy
 client/*
 !client/package.json
 **/.env

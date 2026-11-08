@@ -310,7 +310,7 @@ export function GalleryPage() {
               ))}
             </TextField>
             <Button
-              variant="outlined"
+              variant="contained"
               startIcon={<UploadIcon />}
               disabled={preparing}
               onClick={() => fileInput.current?.click()}
