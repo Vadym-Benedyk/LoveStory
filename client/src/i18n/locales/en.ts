@@ -189,7 +189,8 @@ export const en: Record<string, string> = {
 
   'admin.requests.title': 'Pending requests',
   'admin.requests.empty': 'No pending requests.',
-  'admin.requests.datesGuests': '{checkIn} → {checkOut} · {count} guests',
+  'admin.requests.dates': '{checkIn} → {checkOut}',
+  'admin.requests.guests': '{count} guests',
   'admin.guests.overCapacity': 'over capacity ({capacity})',
   'admin.requests.quote': 'Quote: {amount}',
   'admin.requests.submitted': 'Request submitted: {when}',

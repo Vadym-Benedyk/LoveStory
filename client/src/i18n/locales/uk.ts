@@ -194,7 +194,8 @@ export const uk: Record<string, string> = {
 
   'admin.requests.title': 'Заявки в очікуванні',
   'admin.requests.empty': 'Немає заявок в очікуванні.',
-  'admin.requests.datesGuests': '{checkIn} → {checkOut} · гостей: {count}',
+  'admin.requests.dates': '{checkIn} → {checkOut}',
+  'admin.requests.guests': 'гостей: {count}',
   'admin.guests.overCapacity': 'більше за місткість ({capacity})',
   'admin.requests.quote': 'Сума: {amount}',
   'admin.requests.submitted': 'Заявку сформовано: {when}',

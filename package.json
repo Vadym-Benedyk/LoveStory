@@ -18,6 +18,7 @@
     "build": "npm --workspace server run build && npm --workspace client run build",
     "build:client": "npm --workspace client run build",
     "build:server": "npm --workspace server run build",
+    "deploy:client": "bash infra/deploy-client.sh",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "npm --workspace client run typecheck && npm --workspace server run typecheck",
     "storage:up": "docker compose up -d minio",

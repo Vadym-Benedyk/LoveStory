@@ -1,0 +1,414 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  LoveStory - site and photos on S3 + CloudFront, a bucket for database backups, and the Lightsail
+  instance that runs the API (see docs/deployment-decision.md)
+
+# Deploy in the region of the Lightsail instance (eu-central-1), after certificate.yml. See infra/README.md.
+# Not in this template, on purpose: DNS records (any DNS provider works), IAM access keys (a key created
+# by a stack would be readable in the stack), and the Docker/Caddy setup on the server (deploy/).
+
+Parameters:
+  DomainName:
+    Type: String
+    Description: Apex domain of the site, for example example.com
+    AllowedPattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$
+  CertificateArn:
+    Type: String
+    Description: ARN of the certificate from certificate.yml (it must be in us-east-1)
+    AllowedPattern: ^arn:aws[a-z-]*:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]+$
+  AvailabilityZone:
+    Type: String
+    Default: eu-central-1a
+    Description: Availability zone of the Lightsail instance
+  BundleId:
+    Type: String
+    Default: small_3_0
+    Description: >-
+      Lightsail bundle. small_3_0 is 2 GB RAM / 2 vCPU / 60 GB SSD / 3 TB transfer with a public IPv4.
+      A bundle cannot be changed later by updating the stack (see infra/README.md).
+  BlueprintId:
+    Type: String
+    Default: ubuntu_24_04
+    Description: >-
+      Lightsail OS image. Check the exact ID before deploying:
+      aws lightsail get-blueprints --region eu-central-1 --query "blueprints[?type=='os'].[blueprintId,name]" --output text
+  KeyPairName:
+    Type: String
+    Default: ""
+    Description: Lightsail key pair for SSH. Empty means the regional default key pair.
+  SshCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: Who may reach SSH (port 22), in CIDR notation. Use your own address (x.x.x.x/32) if you can.
+    AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$
+  BackupRetentionDays:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    Description: Database backups in the backup bucket are deleted after this many days
+
+Conditions:
+  HasKeyPair: !Not [!Equals [!Ref KeyPairName, ""]]
+
+Resources:
+  # ---------------------------------------------------------------- buckets (all private)
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # Database dumps hold guests' names and phone numbers: private, and old ones expire.
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-backups
+            Status: Enabled
+            ExpirationInDays: !Ref BackupRetentionDays
+          - Id: abort-incomplete-uploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${SiteBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}
+          - Sid: HttpsOnly
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !GetAtt SiteBucket.Arn
+              - !Sub ${SiteBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+  MediaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MediaBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: CloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${MediaBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${MediaDistribution}
+          - Sid: HttpsOnly
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !GetAtt MediaBucket.Arn
+              - !Sub ${MediaBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+  BackupBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BackupBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: HttpsOnly
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !GetAtt BackupBucket.Arn
+              - !Sub ${BackupBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+  # ---------------------------------------------------------------- CloudFront
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub ${AWS::StackName}-s3
+        Description: CloudFront signs its requests to the private buckets
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # The single-page app. Missing paths come back from S3 as 403/404 and are answered with index.html, so
+  # client-side routes work. This is safe only because the API is NOT behind this distribution.
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub ${AWS::StackName} site
+        Aliases:
+          - !Ref DomainName
+          - !Sub www.${DomainName}
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: site-bucket
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: site-bucket
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          # Managed policies: CachingOptimized, SecurityHeadersPolicy
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+
+  # The photos (S3_PUBLIC_URL=https://cdn.<domain>). No error rewriting: a missing photo stays an error.
+  MediaDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub ${AWS::StackName} photos
+        Aliases:
+          - !Sub cdn.${DomainName}
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: media-bucket
+            DomainName: !GetAtt MediaBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: media-bucket
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+
+  # ---------------------------------------------------------------- IAM users for the server
+  # Create their access keys by hand (infra/README.md); the keys are not part of the stack.
+  MediaUser:
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        - PolicyName: media-bucket
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                # GetObject is for `npm run media:thumbnails`, which reads the originals back.
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource: !Sub ${MediaBucket.Arn}/*
+
+  BackupUser:
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        - PolicyName: backup-bucket
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:AbortMultipartUpload
+                Resource: !Sub ${BackupBucket.Arn}/*
+
+  # ---------------------------------------------------------------- Lightsail
+  Instance:
+    Type: AWS::Lightsail::Instance
+    Properties:
+      InstanceName: !Sub ${AWS::StackName}-api
+      BlueprintId: !Ref BlueprintId
+      BundleId: !Ref BundleId
+      AvailabilityZone: !Ref AvailabilityZone
+      KeyPairName: !If [HasKeyPair, !Ref KeyPairName, !Ref "AWS::NoValue"]
+      Networking:
+        # All ports to open must be listed here, the defaults are not kept.
+        Ports:
+          - Protocol: tcp
+            FromPort: 80
+            ToPort: 80
+            Cidrs: [0.0.0.0/0]
+            Ipv6Cidrs: ["::/0"]
+          - Protocol: tcp
+            FromPort: 443
+            ToPort: 443
+            Cidrs: [0.0.0.0/0]
+            Ipv6Cidrs: ["::/0"]
+          - Protocol: tcp
+            FromPort: 22
+            ToPort: 22
+            Cidrs: [!Ref SshCidr]
+      AddOns:
+        # Daily snapshot of the whole instance, the last 7 are kept; time in UTC, HH:00.
+        - AddOnType: AutoSnapshot
+          Status: Enabled
+          AutoSnapshotAddOnRequest:
+            SnapshotTimeOfDay: "02:00"
+      # Runs once, when the instance is first created (changing it later does not run it again).
+      UserData: |
+        #!/bin/bash
+        set -euxo pipefail
+        export DEBIAN_FRONTEND=noninteractive
+
+        # 2 GB of swap: building the Docker image on a 2 GB machine can run out of memory without it.
+        if [ ! -f /swapfile ]; then
+          fallocate -l 2G /swapfile
+          chmod 600 /swapfile
+          mkswap /swapfile
+          swapon /swapfile
+          echo '/swapfile none swap sw 0 0' >> /etc/fstab
+        fi
+
+        apt-get update
+        apt-get install -y ca-certificates curl git sqlite3
+
+        # Docker Engine from Docker's own apt repository (Docker's install steps for Ubuntu).
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+        cat > /etc/apt/sources.list.d/docker.sources <<EOF
+        Types: deb
+        URIs: https://download.docker.com/linux/ubuntu
+        Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+        Components: stable
+        Architectures: $(dpkg --print-architecture)
+        Signed-By: /etc/apt/keyrings/docker.asc
+        EOF
+        apt-get update
+        apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        systemctl enable --now docker
+
+        # The login user of the Ubuntu image may run docker without sudo; the repo goes in /opt/lovestory.
+        usermod -aG docker ubuntu || true
+        mkdir -p /opt/lovestory
+        chown ubuntu:ubuntu /opt/lovestory || true
+
+  StaticIp:
+    Type: AWS::Lightsail::StaticIp
+    DependsOn: Instance
+    Properties:
+      StaticIpName: !Sub ${AWS::StackName}-api-ip
+      AttachedTo: !Sub ${AWS::StackName}-api
+
+Outputs:
+  SiteBucketName:
+    Description: Upload the built client here (client/dist)
+    Value: !Ref SiteBucket
+  SiteDistributionId:
+    Description: Invalidate /index.html here after each client deploy
+    Value: !Ref SiteDistribution
+  SiteDistributionDomain:
+    Description: Point the apex domain and www at this
+    Value: !GetAtt SiteDistribution.DomainName
+  MediaBucketName:
+    Description: S3_BUCKET for the API
+    Value: !Ref MediaBucket
+  MediaDistributionDomain:
+    Description: Point cdn.<domain> at this (CNAME); S3_PUBLIC_URL=https://cdn.<domain>
+    Value: !GetAtt MediaDistribution.DomainName
+  BackupBucketName:
+    Description: BACKUP_S3_URI=s3://<this bucket>/lovestory for deploy/backup.sh
+    Value: !Ref BackupBucket
+  MediaUserName:
+    Description: Create its access key for S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY in deploy/.env
+    Value: !Ref MediaUser
+  BackupUserName:
+    Description: Create its access key for the AWS CLI that backup.sh uses on the server
+    Value: !Ref BackupUser
+  StaticIpAddress:
+    Description: A record for api.<domain>
+    Value: !GetAtt StaticIp.IpAddress
+  InstanceName:
+    Value: !Sub ${AWS::StackName}-api
+  DnsRecordsToCreate:
+    Description: What to create at your DNS provider
+    Value: !Sub "${DomainName} and www.${DomainName} -> ${SiteDistribution.DomainName} (ALIAS/CNAME); cdn.${DomainName} -> ${MediaDistribution.DomainName} (CNAME); api.${DomainName} -> ${StaticIp.IpAddress} (A)"

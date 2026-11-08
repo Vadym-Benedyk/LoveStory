@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: LoveStory - TLS certificate for CloudFront (CloudFront only accepts ACM certificates from us-east-1)
+
+# Deploy this first, in us-east-1, then pass its CertificateArn output to app.yml. See infra/README.md.
+# The certificate covers the site (apex and www) and the photo CDN. api.<domain> is not here: Caddy on the
+# Lightsail instance gets its own Let's Encrypt certificate.
+
+Parameters:
+  DomainName:
+    Type: String
+    Description: Apex domain of the site, for example example.com
+    AllowedPattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$
+
+Rules:
+  MustBeUsEast1:
+    Assertions:
+      - Assert: !Equals [!Ref "AWS::Region", us-east-1]
+        AssertDescription: This stack must be created in us-east-1, the only region CloudFront reads certificates from.
+
+Resources:
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Sub www.${DomainName}
+        - !Sub cdn.${DomainName}
+      # DNS validation: the stack waits until the validation CNAME records exist (the events and the ACM
+      # console show them), so add them at your DNS provider while the stack is being created.
+      ValidationMethod: DNS
+
+Outputs:
+  CertificateArn:
+    Description: Pass this to app.yml as CertificateArn
+    Value: !Ref Certificate

@@ -6,11 +6,13 @@ The site itself (S3 + CloudFront) is not part of this; only `api.<domain>` runs 
 
 ## One-time setup
 
-1. Create the instance (Frankfurt, Linux, the 2 GB bundle with a public IPv4) and attach a **static IP**.
-   Firewall: 80 and 443 open to everyone, SSH (22) key-only (restrict it to your IP if you can).
+1. Create the instance (Frankfurt, Linux, the 2 GB bundle with a public IPv4) and attach a **static IP**;
+   [`infra/`](../infra/README.md) does this, and the rest of the AWS side, with CloudFormation. Firewall:
+   80 and 443 open to everyone, SSH (22) key-only (restrict it to your IP if you can).
 2. DNS: an A record `api.<domain>` pointing at the static IP.
 3. On the server install Docker Engine with the Compose plugin (Docker's official instructions for your
-   distribution), `git` and `sqlite3` (for backups). The AWS CLI is only needed to upload backups to S3.
+   distribution), `git` and `sqlite3` (for backups); skip this if the server came from `infra/`, its
+   launch script installs Docker, git and sqlite3. The AWS CLI is only needed to upload backups to S3.
 4. `git clone <repo> /opt/lovestory && cd /opt/lovestory/deploy`
 5. `cp .env.example .env` and fill it in (the comments say how). Keep a copy of `.env` in a password
    manager: it is not in git and not in the backups.

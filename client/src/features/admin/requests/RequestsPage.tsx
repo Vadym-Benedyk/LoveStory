@@ -68,11 +68,12 @@ export function RequestsPage() {
                 {t('admin.requests.submitted', { when: fmtDateTime(b.createdAt) })}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {t('admin.requests.datesGuests', {
-                  checkIn: fmtDate(b.checkIn),
-                  checkOut: fmtDate(b.checkOut),
-                  count: b.guestsCount,
-                })}
+                {/* The stay dates are the key fact of a request, so they stand out; the guest count follows quietly. */}
+                <Box component="span" sx={{ fontWeight: 600 }}>
+                  {t('admin.requests.dates', { checkIn: fmtDate(b.checkIn), checkOut: fmtDate(b.checkOut) })}
+                </Box>
+                {' · '}
+                {t('admin.requests.guests', { count: b.guestsCount })}
               </Typography>
               <Typography variant="body2" sx={{ my: 1 }}>
                 {t('admin.requests.quote', { amount: price.format(b.priceQuoteMinor) })}

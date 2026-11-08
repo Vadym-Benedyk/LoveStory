@@ -10,7 +10,7 @@ panel with a **request → manual phone confirmation → calendar block** bookin
 - **Frontend:** React + Vite + TypeScript, MUI + SCSS Modules (`client/`)
 - **Backend:** Node.js + Express + TypeScript, Prisma + **SQLite** (`server/`)
 - **Photos:** uploaded from the admin (Gallery) to local disk by default (`server/uploads`); switch to S3-compatible storage (AWS S3 / Cloudflare R2 / MinIO) with `STORAGE_DRIVER=s3` — see `server/.env.example`. Every upload is also resized with `sharp`: an 800 px WebP thumbnail for the grids and a 2400 px WebP for the full-screen viewer and the splash (the original is kept); `npm run media:thumbnails` does the same for photos uploaded earlier
-- **Deploy:** single Docker image on an AWS Lightsail instance (persistent disk for the SQLite file); the site and photos on S3 + CloudFront — see [`docs/deployment-decision.md`](docs/deployment-decision.md); compose files, backup script and runbook in [`deploy/`](deploy/README.md)
+- **Deploy:** single Docker image on an AWS Lightsail instance (persistent disk for the SQLite file); the site and photos on S3 + CloudFront — see [`docs/deployment-decision.md`](docs/deployment-decision.md); compose files, backup script and runbook in [`deploy/`](deploy/README.md); the AWS resources as CloudFormation in [`infra/`](infra/README.md)
 
 ## Docs (read these first)
 

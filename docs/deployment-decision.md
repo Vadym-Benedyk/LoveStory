@@ -19,7 +19,7 @@ Runner, ECS Fargate, Lambda, serverless functions of Vercel/Netlify.
 
 | Part | Where | Notes |
 |---|---|---|
-| SPA | S3 (private, CloudFront OAC) behind CloudFront on `<domain>` | Error responses 403/404 → `/index.html` (200); safe because the API is **not** behind this distribution. `assets/*`: cache 1 year, immutable (Vite hashes names). `index.html`: `no-cache`, invalidate `/index.html` after each deploy. |
+| SPA | S3 (private, CloudFront OAC) behind CloudFront on `<domain>` | Error responses 403/404 → `/index.html` (200); safe because the API is **not** behind this distribution. `assets/*`: cache 1 year, immutable (Vite hashes names). `index.html`: `no-cache`. `infra/deploy-client.sh` uploads it last and invalidates `/` and `/index.html`. |
 | Photos | Separate private S3 bucket behind CloudFront on `cdn.<domain>` | API runs with `STORAGE_DRIVER=s3`, `S3_PUBLIC_URL=https://cdn.<domain>`. Uploads go through the API (validated); each photo is stored with its `-thumb.webp`. |
 | API + database | One **AWS Lightsail** instance, Frankfurt (`eu-central-1`) | Linux, 2 GB RAM / 2 vCPU / 60 GB SSD / 3 TB transfer / public IPv4 bundle (**$12/mo**). Static IP, DNS `api.<domain>`. Docker Compose: Caddy (auto TLS) → Express `:4000`. SQLite at `/data/lovestory.db`, mounted from the instance disk. Firewall: 80/443 open, SSH key-only. |
 
@@ -56,6 +56,21 @@ Not done yet / still to decide:
 - Whether to keep the original at all: it holds GPS and costs storage, but allows remaking the copies.
 - Manual crop (for example for the hero photo): the client sends `crop=x,y,w,h`, the server extracts
   from the original with `sharp`.
+
+## AWS resources as code: `infra/`
+
+The AWS side is described in two CloudFormation templates (runbook in
+[`infra/README.md`](../infra/README.md)): `certificate.yml` (us-east-1: the ACM certificate, which
+CloudFront only reads from there) and `app.yml` (eu-central-1: the site, photo and backup buckets, both
+CloudFront distributions with origin access control, the two IAM users, the Lightsail instance with its
+firewall, daily snapshots and a launch script that installs Docker, and the static IP). DNS records, IAM
+access keys and the app setup on the server stay outside the templates.
+
+Status: both pass `cfn-lint`; neither has been deployed. Not confirmed in the docs: that CloudFront
+distributions can be created from a eu-central-1 stack (the certificate is passed in by ARN because stack
+outputs cannot be referenced across regions), and the exact Lightsail blueprint ID (`ubuntu_24_04` is the
+default; the README shows how to check it). A replaced Lightsail instance starts with an empty disk, so
+every stack change that replaces it needs a restore from backup.
 
 ## Cost (prices checked 2026-11-08, USD, without taxes)
 
