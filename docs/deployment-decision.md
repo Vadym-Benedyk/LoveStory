@@ -35,21 +35,23 @@ Wiring:
   Test a restore on a clean machine once.
 - S3 access: an IAM user limited to the media bucket, keys in the server's `.env`. Lightsail instance
   IAM roles are reported as unavailable (community answer, not confirmed in the official docs).
-- Release: build a multi-arch image (`linux/amd64` + `linux/arm64`), `docker compose pull && up -d`.
+- Release: build the image (commands in the header of `server/Dockerfile`; it builds for both
+  `linux/amd64` and `linux/arm64`), push it to a registry, `docker compose pull && up -d`. On the first
+  run and after schema changes, run the `tools` image first (`prisma:push`, and `prisma:seed` once).
   The API is down for a few seconds during a redeploy (single SQLite writer); the static site stays up.
 
 ## Photo processing: on the API with `sharp`, not Lambda
 
 Uploads already pass through the API (byte validation), so processing happens there; no S3 events or
-Lambda. State of the working tree on 2026-11-08 (uncommitted): `server/src/lib/thumbnail.ts` makes an
-800 px WebP thumbnail per upload (EXIF-rotated, no metadata), the original is stored unchanged, and
-`npm run media:thumbnails` backfills older photos.
+Lambda. State of the working tree on 2026-11-08 (uncommitted): `server/src/lib/image-variants.ts` makes
+two WebP copies per upload: an 800 px thumbnail (grids) and, for big originals, a 2400 px "large" copy
+(full-screen viewer and splash; it becomes the photo's `url`). Both are EXIF-rotated and carry no
+metadata. The original is kept (`Media.storageKey`) but no public page links to it; it still has its
+EXIF, including GPS. `npm run media:thumbnails` backfills older photos.
 
 Not done yet / still to decide:
 
-- Originals keep their EXIF (including GPS) and are public. Option: store a downscaled master
-  (about 2400 px WebP, metadata stripped) instead of the raw upload.
-- More sizes for `srcset` (for example 640 / 1280 px) in addition to the 800 px thumbnail.
+- Whether to keep the original at all: it holds GPS and costs storage, but allows remaking the copies.
 - Manual crop (for example for the hero photo): the client sends `crop=x,y,w,h`, the server extracts
   from the original with `sharp`.
 
@@ -73,21 +75,47 @@ with one volume and have short downtime on deploy.
 - Anywhere else: Docker image + SQLite backup + env vars. Keep the image multi-arch and the restore
   procedure tested.
 
-## Known gaps before the first deploy
+## Deploy fixes (2026-11-08)
 
-- `server/Dockerfile` copies `server/node_modules/.prisma`, but in this npm workspace the generated
-  client lives in the root `node_modules/.prisma`, so the image build most likely fails (not built).
-- Nothing creates or updates the schema inside the container: `prisma` is a devDependency and the
-  runtime image installs without dev dependencies. `prisma:deploy` runs `db push --accept-data-loss`,
-  never run it on production data.
-- No `.dockerignore`: `server/prisma/dev.db` is copied into the image, `.env` and `uploads/` into the
-  build context.
-- `media:thumbnails` runs through `tsx` (devDependency), which is not in the runtime image.
+Done, and checked by building the images and running them (details under "Checked" below):
+
+- `server/Dockerfile` did not build at all: `npm ci` failed because better-sqlite3 has no ready-made
+  binary for Alpine (musl) on arm64, and compiling it needs python/make/g++. It is now Debian slim
+  (`node:26-bookworm-slim`: Node 20 reached end of life on 2026-04-30, Node 26 became LTS on
+  2026-10-28, and the dev machine runs Node 26). The `.prisma` copy path is fixed (the generated client
+  is in the root `node_modules`). `prisma generate` gets a placeholder `DATABASE_URL` because
+  `prisma.config.ts` requires one (the old build only got past this by copying a local `server/.env`
+  into the image).
+- New `tools` stage (`--target tools`): the build stage as a maintenance image for `prisma:push`,
+  `prisma:seed` and `media:thumbnails` against the production volume (the runtime image has no `tsx`
+  and no `prisma.config.ts`). The commands are in the header of `server/Dockerfile`.
+- `.dockerignore` in the repo root: no `.env` files, SQLite files or `uploads/` in the build context,
+  so `dev.db` no longer ends up in the image.
+- `prisma:deploy` (`db push --accept-data-loss`) removed from `server/package.json`; nothing used it.
+  `prisma db push` without that flag refuses changes that would lose data.
+- `server/.env.example`: a production block (`TRUST_PROXY=1`, canonical `CLIENT_ORIGIN`,
+  `DATABASE_URL`), and `s3:GetObject` added to the IAM list because `media:thumbnails` reads the
+  originals back.
+
+Checked (arm64 build on Apple Silicon, run in Docker): schema push on an empty volume and seed with
+the `tools` image; the API image starts and `/api/health` answers; owner login works; a 3000×2000 PNG
+upload produced the thumbnail and large WebP copies (sharp works in the runtime image) and both are
+served; `SIGTERM` shuts the server down cleanly; the data is still there after a container restart.
+The amd64 image builds too and its native modules (better-sqlite3, sharp) load, but amd64 was only run
+under emulation and not through the full test above.
+
+Still open:
+
+- No production Compose file, Caddyfile or backup script in the repo yet (the layout is described above).
+- The runtime image is about 1.2 GB (`docker images`). `@prisma/client` 7.8 pulls the `prisma` CLI,
+  with its Studio and TypeScript dependencies, into `node_modules` (407 MB in total). It works; trim
+  it later if pulls feel slow.
 - `storage.ts` requires `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` (fits the IAM-user decision above).
 - Double-booking is prevented only by a SQLite transaction (`booking.service.ts`): keep a single
   instance, and re-add an exclusion constraint if the database ever moves to Postgres.
 
 ## Open points
 
-- CPU architecture of the Lightsail bundle not verified (hence the multi-arch image).
+- CPU architecture of the Lightsail bundle not verified; the image builds for both x86-64 and arm64,
+  so it does not block anything.
 - Confirm the plan, region and price in the Lightsail console before ordering.

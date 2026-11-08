@@ -65,8 +65,7 @@ async function main() {
       }
 
       if (Object.keys(data).length === 0) {
-        optimal++;
-        console.log(`· ${photo.storageKey}: already small and light, no large copy needed`);
+        optimal++; // small and light enough: its original is already what the viewer should show
         continue;
       }
       await prisma.media.update({ where: { id: photo.id }, data });

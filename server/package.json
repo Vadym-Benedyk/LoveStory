@@ -12,7 +12,6 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma db push --accept-data-loss",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
     "admin:reset": "tsx scripts/reset-admin-password.ts",

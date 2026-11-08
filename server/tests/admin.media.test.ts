@@ -29,15 +29,18 @@ let JPEG: Buffer;
 let WEBP: Buffer;
 let AVIF: Buffer;
 
-// A flat-colour picture of the given size (cheap), or one full of noise (like a real photo: big file).
-const blank = (width: number, height: number, noisy = false) =>
+// A flat-colour picture of the given size (cheap), or one full of noise like a real photo: `true` for
+// plenty (a big file), or a number for the noise strength (weaker noise encodes faster).
+const blank = (width: number, height: number, noisy: boolean | number = false) =>
   sharp({
     create: {
       width,
       height,
       channels: 3,
       background: { r: 60, g: 120, b: 90 },
-      ...(noisy ? { noise: { type: 'gaussian' as const, mean: 128, sigma: 40 } } : {}),
+      ...(noisy
+        ? { noise: { type: 'gaussian' as const, mean: 128, sigma: typeof noisy === 'number' ? noisy : 40 } }
+        : {}),
     },
   });
 
@@ -271,9 +274,9 @@ describe('thumbnails', () => {
 });
 
 describe('large copy (the image of the full-screen viewer and the splash)', () => {
-  let BIG: Buffer; // 2600×1950: wider than the 2400 px limit
+  let BIG: Buffer; // 2500×1875: wider than the 2400 px limit
   beforeAll(async () => {
-    BIG = await blank(2600, 1950, true).jpeg({ quality: 90 }).toBuffer();
+    BIG = await blank(2500, 1875, 12).jpeg({ quality: 90 }).toBuffer();
   });
   const fileOf = (key: string) => fs.readFile(path.join(UPLOADS_DIR, key));
 
@@ -316,7 +319,7 @@ describe('large copy (the image of the full-screen viewer and the splash)', () =
 
   it('applies the EXIF orientation to the large copy too', async () => {
     // 2600×1700 pixels flagged "rotate 90°": shown as a 1700×2600 portrait → 1569×2400.
-    const rotated = await blank(2600, 1700, true).jpeg({ quality: 85 }).withMetadata({ orientation: 6 }).toBuffer();
+    const rotated = await blank(2600, 1700, 12).jpeg({ quality: 85 }).withMetadata({ orientation: 6 }).toBuffer();
     const m = await uploadOk(rotated, {}, 'image/jpeg');
     const meta = await sharp(await fileOf(largeKeyFor(m.storageKey))).metadata();
     expect(meta.height).toBe(2400);

@@ -1,0 +1,16 @@
+# The build context is the repo root (see server/Dockerfile). Keep it small, and keep local secrets
+# and data (.env files, SQLite files, uploaded photos) out of the image.
+**/node_modules
+**/dist
+.git
+docs
+client/*
+!client/package.json
+**/.env
+**/.env.*
+!**/.env.example
+server/uploads
+server/prisma/*.db
+server/prisma/*.db-*
+**/*.log
+**/.DS_Store
