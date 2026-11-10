@@ -10,6 +10,15 @@ Parameters:
     Type: String
     Description: Apex domain of the site, for example example.com
     AllowedPattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$
+  HostedZoneId:
+    Type: String
+    Default: ""
+    Description: >-
+      Route 53 hosted zone of the domain. When set, the validation records are created in it automatically.
+      Empty means the DNS is elsewhere and you add the validation records by hand.
+
+Conditions:
+  HasHostedZone: !Not [!Equals [!Ref HostedZoneId, ""]]
 
 Rules:
   MustBeUsEast1:
@@ -25,9 +34,19 @@ Resources:
       SubjectAlternativeNames:
         - !Sub www.${DomainName}
         - !Sub cdn.${DomainName}
-      # DNS validation: the stack waits until the validation CNAME records exist (the events and the ACM
-      # console show them), so add them at your DNS provider while the stack is being created.
+      # DNS validation: the stack waits until the validation CNAME records exist. With HostedZoneId they are
+      # created in Route 53 for you; without it, add them at your DNS provider while the stack is being
+      # created (the events and the ACM console show them).
       ValidationMethod: DNS
+      DomainValidationOptions: !If
+        - HasHostedZone
+        - - DomainName: !Ref DomainName
+            HostedZoneId: !Ref HostedZoneId
+          - DomainName: !Sub www.${DomainName}
+            HostedZoneId: !Ref HostedZoneId
+          - DomainName: !Sub cdn.${DomainName}
+            HostedZoneId: !Ref HostedZoneId
+        - !Ref AWS::NoValue
 
 Outputs:
   CertificateArn:

@@ -7,10 +7,13 @@ Two templates describe the AWS side of [`docs/deployment-decision.md`](../docs/d
 | `certificate.yml` | us-east-1 | The ACM certificate for `<domain>`, `www.<domain>` and `cdn.<domain>` (CloudFront only reads certificates from us-east-1) |
 | `app.yml` | eu-central-1 | Three private S3 buckets (site, photos, database backups), two CloudFront distributions (site, photos), two IAM users (photos, backups), the Lightsail instance (2 GB, daily snapshots, firewall, Docker installed on first boot) and its static IP |
 
-Not created on purpose: DNS records (any DNS provider works), IAM access keys (a key made by a stack is
+Not created on purpose: the DNS zone and, unless you pass `HostedZoneId`, the DNS records (any DNS provider
+works), IAM access keys (a key made by a stack is
 readable in the stack), and the app setup on the server (that is [`deploy/`](../deploy/README.md)).
 
-Status: both templates pass `cfn-lint` (1.60.0). They have not been deployed yet.
+Status: both templates pass `cfn-lint`. `certificate.yml` is being deployed for `lovestory.vin` (started
+2026-11-10); `app.yml` has not been deployed yet. The Lightsail IDs `small_3_0` and `ubuntu_24_04` were
+confirmed in eu-central-1 on 2026-11-10.
 
 ## Before you start
 
@@ -22,16 +25,31 @@ aws lightsail get-bundles --region eu-central-1 --query "bundles[].[bundleId,pri
 aws lightsail get-blueprints --region eu-central-1 --query "blueprints[?type=='os'].[blueprintId,name]" --output text
 ```
 
+## 0. DNS zone (Route 53)
+
+An apex domain (`example.com` without `www`) can only point at CloudFront through an ALIAS record or CNAME
+flattening. If your DNS provider has neither, host the zone in Route 53 ($0.50 a month): create it, then
+replace the name servers at the registrar with the four it returns.
+
+```bash
+aws route53 create-hosted-zone --name example.com --caller-reference "lovestory-$(date +%s)" \
+  --query "{Id:HostedZone.Id,NS:DelegationSet.NameServers}"
+```
+
+Pass the zone ID (the part after `/hostedzone/`) as `HostedZoneId` in steps 1 and 2: the stacks then create
+the validation records and the site, `www`, `cdn` and `api` records themselves, and step 3 is not needed.
+With another DNS provider, leave `HostedZoneId` out and create the records by hand.
+
 ## 1. Certificate
 
 ```bash
 aws cloudformation deploy --region us-east-1 --stack-name lovestory-cert \
-  --template-file infra/certificate.yml --parameter-overrides DomainName=example.com
+  --template-file infra/certificate.yml --parameter-overrides DomainName=example.com HostedZoneId=<zone ID>
 ```
 
-The command waits until the certificate is validated. While it waits, open the certificate in the ACM
-console (us-east-1) and create the DNS validation CNAME records it lists at your DNS provider. Then read
-the ARN:
+The command waits until the certificate is validated, which needs the registrar to point at the Route 53
+name servers already. Without `HostedZoneId`: while it waits, open the certificate in the ACM console
+(us-east-1) and create the DNS validation CNAME records it lists at your DNS provider. Then read the ARN:
 
 ```bash
 aws cloudformation describe-stacks --region us-east-1 --stack-name lovestory-cert --query "Stacks[0].Outputs" --output table
@@ -42,7 +60,7 @@ aws cloudformation describe-stacks --region us-east-1 --stack-name lovestory-cer
 ```bash
 aws cloudformation deploy --region eu-central-1 --stack-name lovestory \
   --template-file infra/app.yml --capabilities CAPABILITY_IAM \
-  --parameter-overrides DomainName=example.com CertificateArn=<arn from step 1> SshCidr=<your IP>/32
+  --parameter-overrides DomainName=example.com CertificateArn=<arn from step 1> HostedZoneId=<zone ID> SshCidr=<your IP>/32
 aws cloudformation describe-stacks --region eu-central-1 --stack-name lovestory --query "Stacks[0].Outputs" --output table
 ```
 
@@ -51,7 +69,8 @@ before they are applied, add `--no-execute-changeset`.
 
 ## 3. DNS
 
-The `DnsRecordsToCreate` output lists what to create:
+Skip this with `HostedZoneId`: the stack has created the records. Otherwise the `DnsRecordsToCreate` output
+lists what to create:
 
 - `<domain>` and `www.<domain>`: ALIAS/CNAME to the site distribution (an apex domain needs a DNS provider
   that supports ALIAS or CNAME flattening, for example Route 53 or Cloudflare).

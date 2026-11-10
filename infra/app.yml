@@ -4,7 +4,7 @@ Description: >-
   instance that runs the API (see docs/deployment-decision.md)
 
 # Deploy in the region of the Lightsail instance (eu-central-1), after certificate.yml. See infra/README.md.
-# Not in this template, on purpose: DNS records (any DNS provider works), IAM access keys (a key created
+# Not in this template, on purpose: DNS records unless HostedZoneId is given, IAM access keys (a key created
 # by a stack would be readable in the stack), and the Docker/Caddy setup on the server (deploy/).
 
 Parameters:
@@ -16,6 +16,12 @@ Parameters:
     Type: String
     Description: ARN of the certificate from certificate.yml (it must be in us-east-1)
     AllowedPattern: ^arn:aws[a-z-]*:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]+$
+  HostedZoneId:
+    Type: String
+    Default: ""
+    Description: >-
+      Route 53 hosted zone of the domain. When set, the records for the site, www, cdn and api are created
+      in it. Empty means the DNS is elsewhere and you create them by hand (see the DnsRecordsToCreate output).
   AvailabilityZone:
     Type: String
     Default: eu-central-1a
@@ -49,6 +55,7 @@ Parameters:
 
 Conditions:
   HasKeyPair: !Not [!Equals [!Ref KeyPairName, ""]]
+  HasHostedZone: !Not [!Equals [!Ref HostedZoneId, ""]]
 
 Resources:
   # ---------------------------------------------------------------- buckets (all private)
@@ -379,6 +386,50 @@ Resources:
       StaticIpName: !Sub ${AWS::StackName}-api-ip
       AttachedTo: !Sub ${AWS::StackName}-api
 
+  # ---------------------------------------------------------------- DNS (only with a Route 53 zone)
+  # Z2FDTNDATAQYW2 is the fixed hosted zone ID of every CloudFront distribution (alias targets need it).
+  DnsRecords:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: HasHostedZone
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        - Name: !Ref DomainName
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt SiteDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2
+        - Name: !Ref DomainName
+          Type: AAAA
+          AliasTarget:
+            DNSName: !GetAtt SiteDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2
+        - Name: !Sub www.${DomainName}
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt SiteDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2
+        - Name: !Sub www.${DomainName}
+          Type: AAAA
+          AliasTarget:
+            DNSName: !GetAtt SiteDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2
+        - Name: !Sub cdn.${DomainName}
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt MediaDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2
+        - Name: !Sub cdn.${DomainName}
+          Type: AAAA
+          AliasTarget:
+            DNSName: !GetAtt MediaDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2
+        - Name: !Sub api.${DomainName}
+          Type: A
+          TTL: "300"
+          ResourceRecords:
+            - !GetAtt StaticIp.IpAddress
+
 Outputs:
   SiteBucketName:
     Description: Upload the built client here (client/dist)
@@ -410,5 +461,5 @@ Outputs:
   InstanceName:
     Value: !Sub ${AWS::StackName}-api
   DnsRecordsToCreate:
-    Description: What to create at your DNS provider
+    Description: What to create at your DNS provider (already created by this stack when HostedZoneId is set)
     Value: !Sub "${DomainName} and www.${DomainName} -> ${SiteDistribution.DomainName} (ALIAS/CNAME); cdn.${DomainName} -> ${MediaDistribution.DomainName} (CNAME); api.${DomainName} -> ${StaticIp.IpAddress} (A)"

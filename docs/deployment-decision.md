@@ -72,9 +72,29 @@ outputs cannot be referenced across regions), and the exact Lightsail blueprint 
 default; the README shows how to check it). A replaced Lightsail instance starts with an empty disk, so
 every stack change that replaces it needs a restore from backup.
 
+## DNS: Route 53 (decided 2026-11-10)
+
+The domain is `lovestory.vin`. The registrar's free DNS showed no ALIAS/ANAME record type (seen: A, CNAME,
+MX, TXT, AAAA, SRV, CAA; the end of the list was not checked), which the apex needs to point at CloudFront. The zone is hosted in Route 53
+($0.50 a month; zone `Z02752833BHZ9SWEOTA2R`, created with the CLI, not by a stack); the domain stays at
+the registrar, only its name servers change. Both templates take an optional `HostedZoneId` and then create
+the certificate validation records and the site, `www`, `cdn` and `api` records themselves.
+
+## Email on the domain (decided 2026-11-10)
+
+The owner's mailbox on the site's domain is hosted by **iCloud+ Custom Email Domain** (the owner uses an
+iPhone; mail arrives in the built-in Mail app; from $0.99/month in the US, price varies by country; up to
+5 domains with 10 addresses each). It is tied to the owner's personal Apple Account. Apple lists the DNS
+records to add (MX, SPF, DKIM) during setup; they do not clash with the CloudFront and `api.` records.
+
+Still open: what the site sends its notifications through (`SMTP_URL`). Options: iCloud SMTP
+(`smtp.mail.me.com:587` with an app-specific password; not verified that it can send from the
+custom-domain address) or Amazon SES ($0.10 per 1,000 emails). If two services send mail for the domain,
+both must be in the single SPF record. Telegram notifications work without any of this.
+
 ## Cost (prices checked 2026-11-08, USD, without taxes)
 
-About **$12–13 per month**: Lightsail $12, S3 a few cents, CloudFront inside the always-free tier
+About **$13 per month**: Lightsail $12, Route 53 zone $0.50, S3 a few cents, CloudFront inside the always-free tier
 (1 TB transfer, 10 M requests, 2 M function invocations per month). Not included: domain/DNS,
 snapshot storage (price not checked), traffic above the 3 TB bundle.
 
