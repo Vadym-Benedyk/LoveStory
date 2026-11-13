@@ -41,13 +41,13 @@ describe('route guards', () => {
 
 describe('review moderation', () => {
   it('a submitted review stays private until approved, then shows with the owner reply', async () => {
-    const submit = await call(srv, 'POST', '/reviews', {
-      body: { authorName: 'Олена', rating: 5, body: 'Чудове місце біля річки' },
+    // There is no open review form (reviews come through invitation links, see
+    // reviews.invite.test.ts), so the pending review is created directly.
+    const { id } = await prisma.review.create({
+      data: { authorName: 'Олена', rating: 5, body: 'Чудове місце біля річки' },
     });
-    expect(submit.status).toBe(201);
     expect((await call(srv, 'GET', '/reviews')).body.reviews).toEqual([]);
 
-    const id = submit.body.id;
     expect((await call(srv, 'PATCH', `/admin/reviews/${id}`, { token: manager, body: { status: 'APPROVED' } })).status).toBe(200);
     await call(srv, 'PATCH', `/admin/reviews/${id}`, { token: owner, body: { ownerReply: ' Дякуємо! ' } });
 

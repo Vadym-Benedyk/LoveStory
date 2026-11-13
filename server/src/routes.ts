@@ -5,7 +5,7 @@ import { publicContentRouter, adminContentRouter } from './modules/content/conte
 import { adminCalendarRouter } from './modules/calendar/calendar.routes.js';
 import { adminMediaRouter } from './modules/media/media.routes.js';
 import { adminPricingRouter } from './modules/pricing/pricing.routes.js';
-import { adminReviewsRouter } from './modules/reviews/reviews.routes.js';
+import { adminReviewsRouter, publicReviewsRouter } from './modules/reviews/reviews.routes.js';
 import { adminSettingsRouter } from './modules/settings/settings.routes.js';
 
 export const apiRouter = Router();
@@ -16,6 +16,7 @@ apiRouter.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 // ---- Public API ----
 apiRouter.use('/', publicContentRouter); // /content /gallery /promotions /reviews /pricing
 apiRouter.use('/', publicBookingRouter); // /availability /quote /bookings
+apiRouter.use('/', publicReviewsRouter); // /reviews/invite/:token
 
 // ---- Admin API (guarded inside each router) ----
 apiRouter.use('/admin/auth', authRouter);

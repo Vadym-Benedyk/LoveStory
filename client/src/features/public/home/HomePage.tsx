@@ -9,6 +9,8 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
 import PlaceIcon from '@mui/icons-material/Place';
 import PetsIcon from '@mui/icons-material/Pets';
+import VerifiedIcon from '@mui/icons-material/Verified';
+import { useFormatStayMonth } from '@/i18n/DateLocaleProvider';
 import { PhotoGrid } from '../gallery/PhotoGrid';
 import { HeroImage } from './HeroImage';
 import { PricingSection } from './PricingSection';
@@ -30,6 +32,7 @@ const HOME_GALLERY_LIMIT = 6;
 export function HomePage() {
   const { data, isPending: contentPending } = useSiteContent();
   const { data: reviews } = useReviews();
+  const fmtStayMonth = useFormatStayMonth();
   const { data: gallery, isPending: galleryPending } = useGallery();
   const { t } = useLanguage();
   // Text edited in the admin (Content) wins; the built-in translation is the fallback.
@@ -191,12 +194,15 @@ export function HomePage() {
         {reviews && reviews.reviews.length > 0 && (
           <Box component="section" className={styles.sectionAlt}>
             <Container>
-              <Stack direction="row" alignItems="center" spacing={2} mb={2}>
+              <Stack direction="row" alignItems="center" spacing={2}>
                 <Typography variant="h2">{t('reviews.title')}</Typography>
                 {reviews.summary.average != null && (
                   <Rating value={reviews.summary.average} precision={0.5} readOnly />
                 )}
               </Stack>
+              <Typography variant="body2" color="text.secondary" mb={2}>
+                {t('reviews.howTo')}
+              </Typography>
               <Grid container spacing={3}>
                 {reviews.reviews.slice(0, 3).map((r) => (
                   <Grid key={r.id} item xs={12} md={4}>
@@ -204,8 +210,13 @@ export function HomePage() {
                       <Rating value={r.rating} readOnly size="small" />
                       {r.title && <Typography variant="subtitle1">{r.title}</Typography>}
                       <Typography variant="body2">{r.body}</Typography>
-                      <Typography variant="caption">
-                        {[r.authorName, r.stayMonth].filter(Boolean).join(' · ')}
+                      <Typography variant="caption" className={styles.reviewMeta}>
+                        {[r.authorName, r.stayMonth && fmtStayMonth(r.stayMonth)].filter(Boolean).join(' · ')}
+                        {r.verified && (
+                          <span className={styles.verified} title={t('reviews.verified')}>
+                            <VerifiedIcon fontSize="inherit" /> {t('reviews.verified')}
+                          </span>
+                        )}
                       </Typography>
                       {r.ownerReply && (
                         <div className={styles.ownerReply}>

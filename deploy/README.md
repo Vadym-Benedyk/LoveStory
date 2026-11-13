@@ -41,7 +41,9 @@ docker compose up -d
 
 The API is unavailable for a few seconds while its container is replaced; the site stays up. If
 `prisma:push` refuses a change because it would lose data, stop there: take a backup (below) and decide
-by hand, do not force it. To build elsewhere, set `API_IMAGE` in `.env` and use `docker compose pull api`
+by hand, do not force it. One known false alarm: adding a nullable unique column (for example
+`Booking.reviewInviteToken`, release of 2026-11-13) makes `prisma:push` warn about a unique constraint;
+with the column new and empty nothing can be lost, so `prisma db push --accept-data-loss` is right there. To build elsewhere, set `API_IMAGE` in `.env` and use `docker compose pull api`
 on the server instead of `build`. The `tools` image is always built on the server from the checkout.
 
 ## Backups and restore

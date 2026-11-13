@@ -184,6 +184,20 @@
   gap: 0.5rem;
 }
 
+.reviewMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+}
+
+.verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: t.$forest;
+}
+
 .ownerReply {
   margin-top: auto; // pin to the card bottom so replies line up across the row
   padding: 0.75rem 1rem;

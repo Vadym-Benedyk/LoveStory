@@ -1,11 +1,12 @@
 # AWS resources (CloudFormation)
 
-Three templates describe the AWS side of [`docs/deployment-decision.md`](../docs/deployment-decision.md):
+Four templates describe the AWS side of [`docs/deployment-decision.md`](../docs/deployment-decision.md):
 
 | Template | Region | Creates |
 |---|---|---|
 | `certificate.yml` | us-east-1 | The ACM certificate for `<domain>`, `www.<domain>` and `cdn.<domain>` (CloudFront only reads certificates from us-east-1) |
 | `server.yml` | eu-central-1 | The Lightsail instance (daily snapshots, firewall, Docker installed on first boot), its static IP, the `api.<domain>` record, the private bucket for database backups and its IAM user |
+| `mail.yml` | eu-central-1 | Amazon SES: the verified domain (DKIM, custom MAIL FROM, DMARC), its DNS records and the IAM user whose key is the SMTP login |
 | `app.yml` | eu-central-1 | Two private S3 buckets (site, photos), two CloudFront distributions in front of them, the site/`www`/`cdn` records and the IAM user for photos |
 
 The server is its own stack so that a failure or change on the CloudFront side never touches the instance
@@ -15,7 +16,8 @@ Not created on purpose: the DNS zone and, unless you pass `HostedZoneId`, the DN
 works), IAM access keys (a key made by a stack is
 readable in the stack), and the app setup on the server (that is [`deploy/`](../deploy/README.md)).
 
-Status for `lovestory.vin` (2026-11-11): all three templates pass `cfn-lint`. `certificate.yml` is deployed
+Status for `lovestory.vin` (2026-11-13): `mail.yml` is deployed (SES domain verified, SMTP key on the
+server, account still in the sandbox). As of 2026-11-11 all templates pass `cfn-lint`. `certificate.yml` is deployed
 (stack `lovestory-cert`, certificate issued). `server.yml` is deployed (stack `lovestory-server`, bundle
 `micro_3_0`, 1 GB). `app.yml` is **not** deployed: the new AWS account must be verified by AWS Support
 before it may create CloudFront distributions.
@@ -134,6 +136,41 @@ other files with `no-cache`, `index.html` last, and invalidates `/` and `/index.
 Nothing is deleted from the bucket, so a visitor who still has the previous page open can load its files;
 remove old files by hand now and then if you like. Other `VITE_*` settings, such as
 `VITE_GOOGLE_MAPS_EMBED`, are read from `client/.env` as usual.
+
+## 7. Email from the site (SES)
+
+```bash
+aws cloudformation deploy --region eu-central-1 --stack-name lovestory-mail \
+  --template-file infra/mail.yml --capabilities CAPABILITY_IAM \
+  --parameter-overrides DomainName=example.com HostedZoneId=<zone ID>
+```
+
+The domain is verified once the DKIM and MAIL FROM records resolve (minutes): `aws sesv2 get-email-identity
+--region eu-central-1 --email-identity example.com` shows `VerifiedForSendingStatus: true`. Without
+`HostedZoneId`, create the records from the `DnsRecordsToCreate` output by hand.
+
+SES wants an SMTP password derived from the IAM key. The helper reads the key from stdin and prints the
+`SMTP_URL`; piping it straight to the server keeps it out of the terminal and the shell history:
+
+```bash
+aws iam create-access-key --user-name <SmtpUserName output> --query "AccessKey.[AccessKeyId,SecretAccessKey]" \
+  --output text | python3 infra/ses-smtp-url.py eu-central-1 | ssh ubuntu@<static IP> 'read -r URL; ...'
+```
+
+On the server put the URL into `deploy/.env` as `SMTP_URL`, add `NOTIFY_FROM` and `NOTIFY_EMAIL`
+(`deploy/.env.example`), then `docker compose up -d --force-recreate api`. Test with the SES mailbox
+simulator (`success@simulator.amazonses.com` accepts mail in the sandbox).
+
+A new SES account is in the sandbox: mail goes only to verified addresses (`aws sesv2
+create-email-identity --email-identity <address>` sends a verification link), 200 a day. To write to
+guests, request production access once the site is reachable:
+
+```bash
+aws sesv2 put-account-details --region eu-central-1 --production-access-enabled --mail-type TRANSACTIONAL \
+  --website-url https://example.com --additional-contact-email-addresses owner@example.com --contact-language EN
+```
+
+AWS answers within 96 hours; the details cannot be edited while the request is under review.
 
 ## Changing things later
 

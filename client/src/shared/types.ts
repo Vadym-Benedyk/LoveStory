@@ -43,6 +43,11 @@ export interface Booking {
   internalNotes?: string | null;
   confirmedAt?: string | null;
   confirmedBy?: { name: string; email: string } | null;
+  // Review invitation (sent after check-out) and the review it produced, if any.
+  reviewInviteToken?: string | null;
+  reviewInvitedAt?: string | null;
+  reviewInviteChannel?: 'EMAIL' | 'TELEGRAM' | 'MANUAL' | null;
+  review?: { id: string; status: ReviewStatus; rating: number } | null;
   createdAt: string;
 }
 
@@ -78,9 +83,10 @@ export interface PublicReview {
   rating: number;
   title?: string | null;
   body: string;
-  stayMonth?: string | null;
+  stayMonth?: string | null; // "YYYY-MM" for invited reviews, free text for imported ones
   ownerReply?: string | null;
   createdAt: string;
+  verified?: boolean; // came through the invitation link of a real stay
 }
 
 // Admin shape (GET /admin/reviews).
@@ -88,6 +94,17 @@ export interface Review extends PublicReview {
   status: ReviewStatus;
   source: string;
   approvedAt?: string | null;
+  bookingId?: string | null;
+  booking?: { reference: string; checkIn: string; checkOut: string } | null;
+}
+
+// Public shape of a review invitation (GET /reviews/invite/:token).
+export interface ReviewInvite {
+  state: 'OPEN' | 'USED' | 'EXPIRED';
+  propertyName: string;
+  guestFirstName: string;
+  checkIn: string;
+  checkOut: string;
 }
 
 export interface SiteContent {

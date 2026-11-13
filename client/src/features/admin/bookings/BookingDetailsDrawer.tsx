@@ -14,12 +14,14 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PhoneIcon from '@mui/icons-material/Phone';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import { Link as RouterLink } from 'react-router-dom';
 import type { Booking } from '@/shared/types';
 import { usePrice } from '@/shared/usePrice';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useToast } from '@/shared/ui/ToastProvider';
 import { useFormatDate } from '@/i18n/DateLocaleProvider';
-import { useUpdateBookingNotes } from '../api';
+import { useSendReviewInvite, useUpdateBookingNotes } from '../api';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -53,6 +55,7 @@ export function BookingDetailsDrawer({
   const price = usePrice();
   const fmtDate = useFormatDate();
   const save = useUpdateBookingNotes();
+  const invite = useSendReviewInvite();
   const [notes, setNotes] = useState('');
 
   // Load the note of the booking being shown (and reset when switching bookings).
@@ -132,6 +135,22 @@ export function BookingDetailsDrawer({
             )}
           </Stack>
 
+          {booking.status === 'CONFIRMED' && (
+            <>
+              <Divider />
+              <ReviewSection
+                booking={booking}
+                busy={invite.isPending}
+                onSend={() =>
+                  invite.mutate(booking.id, {
+                    onSuccess: () => toast.success(t('admin.details.inviteSent')),
+                    onError: () => toast.error(t('admin.details.inviteError')),
+                  })
+                }
+              />
+            </>
+          )}
+
           <Divider />
 
           <Row label={t('admin.details.guestComment')}>
@@ -175,5 +194,65 @@ export function BookingDetailsDrawer({
         </Stack>
       )}
     </Drawer>
+  );
+}
+
+// Review invitation of a confirmed stay: sent by itself after check-out (the hourly server job),
+// or from here earlier / again. Shows the link to forward and, once it came, the review.
+function ReviewSection({ booking, busy, onSend }: { booking: Booking; busy: boolean; onSend: () => void }) {
+  const { t } = useLanguage();
+  const toast = useToast();
+  const fmtDate = useFormatDate();
+  const link = booking.reviewInviteToken ? `${window.location.origin}/review/${booking.reviewInviteToken}` : null;
+  const checkedOut = Date.parse(booking.checkOut.slice(0, 10)) <= Date.now();
+
+  if (booking.review) {
+    return (
+      <Row label={t('admin.details.review')}>
+        {t('admin.details.reviewReceived', { rating: String(booking.review.rating) })}
+        {' · '}
+        {t(`admin.reviews.status.${booking.review.status}`)}
+        <Box mt={1}>
+          <Button size="small" variant="outlined" component={RouterLink} to="/admin/reviews">
+            {t('admin.details.openReviews')}
+          </Button>
+        </Box>
+      </Row>
+    );
+  }
+
+  return (
+    <Row label={t('admin.details.review')}>
+      {link && booking.reviewInvitedAt ? (
+        <>
+          {t('admin.details.reviewInvited', { date: fmtDate(booking.reviewInvitedAt) })}
+          {booking.reviewInviteChannel && ` · ${t(`admin.details.reviewChannel.${booking.reviewInviteChannel}`)}`}
+          <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+            {t('admin.details.reviewLink')}
+          </Typography>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+              {link}
+            </Typography>
+            <IconButton
+              size="small"
+              aria-label={t('admin.details.copyLink')}
+              onClick={() => navigator.clipboard.writeText(link).then(() => toast.success(t('admin.details.linkCopied')))}
+            >
+              <ContentCopyIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        </>
+      ) : (
+        <Typography variant="body2" color="text.secondary">
+          {t('admin.details.reviewNotYet')}
+        </Typography>
+      )}
+      <Box mt={1}>
+        <Button size="small" variant="outlined" disabled={busy || !checkedOut} onClick={onSend}>
+          {link ? t('admin.details.resendInvite') : t('admin.details.sendInvite')}
+        </Button>
+      </Box>
+    </Row>
   );
 }

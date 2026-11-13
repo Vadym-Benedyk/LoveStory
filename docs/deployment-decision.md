@@ -113,10 +113,32 @@ iPhone; mail arrives in the built-in Mail app; from $0.99/month in the US, price
 5 domains with 10 addresses each). It is tied to the owner's personal Apple Account. Apple lists the DNS
 records to add (MX, SPF, DKIM) during setup; they do not clash with the CloudFront and `api.` records.
 
-Still open: what the site sends its notifications through (`SMTP_URL`). Options: iCloud SMTP
-(`smtp.mail.me.com:587` with an app-specific password; not verified that it can send from the
-custom-domain address) or Amazon SES ($0.10 per 1,000 emails). If two services send mail for the domain,
-both must be in the single SPF record. Telegram notifications work without any of this.
+### What the site sends its mail through: Amazon SES (set up 2026-11-13)
+
+The site sends through **Amazon SES in eu-central-1** ($0.10 per 1,000 emails), not through the owner's
+iCloud mailbox (an application sending to guests needs signed, separately authenticated mail, and iCloud
+SMTP is not meant for it). Stack `lovestory-mail` (`infra/mail.yml`): the verified domain `lovestory.vin`
+(Easy DKIM, custom MAIL FROM `mail.lovestory.vin`, DMARC in monitoring mode `p=none`; all three checks
+show SUCCESS) and an IAM user that may only send as `*@lovestory.vin`. Its key, converted by
+`infra/ses-smtp-url.py`, is the `SMTP_URL` in the server's `deploy/.env`, with
+`NOTIFY_FROM="LoveStory <info@lovestory.vin>"` and `NOTIFY_EMAIL` = the owner's address. Checked on 2026-11-13
+from the API container: messages to the SES mailbox simulator and to the owner's verified address were
+accepted (`250 Ok`), and a message with a sender outside the domain was refused (`554 Access denied`). In
+the sandbox SES also checks the permission on the recipient's identity, so the user's policy allows any
+identity of the account as the resource and limits the sender with `ses:FromAddress`.
+
+The SES SPF record sits on `mail.lovestory.vin`, so the root of the domain stays free for the SPF record
+that iCloud asks for; the three DKIM selectors do not clash with iCloud's either.
+
+**The account is in the SES sandbox**: 200 emails a day, 1 a second, and only to verified addresses
+(the owner's address is verified since 2026-11-13). So owner notifications work, letters to
+guests (review invitations) do not until AWS grants production access. The request is made with
+`aws sesv2 put-account-details` (type TRANSACTIONAL, the site address, a contact address; AWS answers
+within 96 hours and the details cannot be edited while it is under review), **after the site is
+reachable**: `lovestory.vin` itself does not open yet (CloudFront is waiting for AWS to verify the
+account), and the request asks for the site address. Guest replies go to the contact email shown on the
+site, then to the owner's notification address (`resolveGuestReplyTo`), because `info@lovestory.vin` has no
+mailbox until the iCloud domain is set up. Telegram notifications work without any of this.
 
 ## Cost (prices checked 2026-11-08, USD, without taxes)
 

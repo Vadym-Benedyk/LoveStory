@@ -74,6 +74,90 @@ export function formatNewRequestMessage(n: NewRequestNotice): NotificationMessag
 }
 
 // ---------------------------------------------------------------------------
+// Review invitations (reviews/review-invite.service.ts)
+// ---------------------------------------------------------------------------
+
+export interface ReviewInviteNotice {
+  reference: string;
+  guestName: string; // full name, for the owner
+  guestFirstName: string; // for the guest-facing letter
+  propertyName: string;
+  checkIn: Date;
+  checkOut: Date;
+  link: string; // the one-off review page
+}
+
+// Guest-facing. The site is bilingual and the guest's language is unknown, so Ukrainian first with a
+// short English part after it.
+export function formatReviewInviteMessage(n: ReviewInviteNotice): NotificationMessage {
+  const lines = [
+    `Вітаємо, ${n.guestFirstName}!`,
+    '',
+    `Дякуємо, що відпочивали в ${n.propertyName} (${fmtDate(n.checkIn)} – ${fmtDate(n.checkOut)}).`,
+    'Будемо вдячні за короткий відгук: він допомагає іншим гостям і нам. Це займе хвилину:',
+    n.link,
+    '',
+    'Посилання особисте й діє 60 днів. Відгук з’явиться на сайті після перевірки.',
+    '',
+    '---',
+    `Hello ${n.guestFirstName}, thank you for staying at ${n.propertyName}. We would love a short review:`,
+    n.link,
+    'The link is personal and valid for 60 days.',
+  ];
+  return {
+    subject: `Як вам відпочинок у ${n.propertyName}? / How was your stay?`,
+    text: lines.join('\n'),
+  };
+}
+
+// Owner-facing: the guest has no email (or email is not configured), so the owner forwards the link.
+export function formatReviewInviteForOwnerMessage(n: ReviewInviteNotice): NotificationMessage {
+  const lines = [
+    `⭐ Запрошення на відгук — ${n.reference}`,
+    '',
+    `Гість: ${n.guestName}`,
+    `Дати: ${fmtDate(n.checkIn)} → ${fmtDate(n.checkOut)}`,
+    '',
+    'Гість не лишив email, тож перешліть йому це посилання самі (Viber, Telegram, SMS):',
+    n.link,
+    '',
+    'Посилання одноразове й діє 60 днів.',
+  ];
+  return {
+    subject: `Запрошення на відгук ${n.reference}: ${n.guestName}`,
+    text: lines.join('\n'),
+  };
+}
+
+export interface NewReviewNotice {
+  reference?: string | null; // set for an invited (verified) review
+  authorName: string;
+  rating: number;
+  title?: string | null;
+  body: string;
+  adminUrl?: string;
+}
+
+export function formatNewReviewMessage(n: NewReviewNotice): NotificationMessage {
+  const stars = '★'.repeat(n.rating) + '☆'.repeat(5 - n.rating);
+  const lines = [
+    `💬 Новий відгук${n.reference ? ` — бронювання ${n.reference}` : ''}`,
+    '',
+    `Від: ${n.authorName}`,
+    `Оцінка: ${stars} (${n.rating}/5)`,
+    n.title ? `Заголовок: ${n.title}` : null,
+    n.body,
+    '',
+    'Відгук не видимий на сайті, доки ви його не опублікуєте.',
+    n.adminUrl ? `Відгуки: ${n.adminUrl}` : null,
+  ].filter((l): l is string => l !== null);
+  return {
+    subject: `Новий відгук: ${n.rating}/5 від ${n.authorName}`,
+    text: lines.join('\n'),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Retry
 // ---------------------------------------------------------------------------
 

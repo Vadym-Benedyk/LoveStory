@@ -66,6 +66,12 @@ model Booking {
   confirmedById String?
   confirmedBy   User?     @relation("ConfirmedBy", fields: [confirmedById], references: [id])
 
+  // Review invitation (reviews/review-invite.service.ts): a one-off link sent after check-out.
+  reviewInviteToken   String?   @unique
+  reviewInvitedAt     DateTime?
+  reviewInviteChannel String? // EMAIL | TELEGRAM | MANUAL — how the link reached (or will reach) the guest
+  review              Review?
+
   addons    BookingAddon[]
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
@@ -182,6 +188,9 @@ model Review {
   ownerReply   String?
   approvedAt   DateTime?
   approvedById String?
+  // Set when the review came through a booking's invitation link: a verified stay.
+  bookingId    String?   @unique
+  booking      Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

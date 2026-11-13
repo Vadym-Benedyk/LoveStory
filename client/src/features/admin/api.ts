@@ -63,6 +63,18 @@ export function useBookingActions() {
 }
 
 // Manager's private note on a booking.
+// (Re)sends the review invitation of a finished stay; the server answers with the link.
+export const useSendReviewInvite = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      (await api.post<{ token: string; link: string; channel: 'EMAIL' | 'TELEGRAM' | 'MANUAL'; invitedAt: string }>(
+        `/admin/bookings/${id}/review-invite`,
+      )).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'bookings'] }),
+  });
+};
+
 export function useUpdateBookingNotes() {
   const qc = useQueryClient();
   return useMutation({

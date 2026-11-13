@@ -4,8 +4,10 @@ import { validate } from '../../middleware/validate.js';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
 import { bookingRequestLimiter, quoteLimiter } from '../../middleware/rate-limit.js';
 import { toDateOnly } from '../../lib/dates.js';
+import { prisma } from '../../lib/prisma.js';
 import { getUnavailableRanges } from '../availability/availability.service.js';
 import * as service from './booking.service.js';
+import { sendInvite } from '../reviews/review-invite.service.js';
 import {
   adminCreateBookingSchema,
   availabilityQuerySchema,
@@ -86,6 +88,26 @@ adminBookingRouter.post(
       booking.checkOut,
     );
     res.json({ booking, conflictingPendingIds: conflicts });
+  }),
+);
+
+// (Re)send the review invitation for a finished stay. The hourly job does this by itself after
+// check-out; this button is for sending earlier, again, or when the job had no channel to use.
+adminBookingRouter.post(
+  '/:id/review-invite',
+  asyncHandler(async (req, res) => {
+    const id = req.params.id as string;
+    const result = await sendInvite(id, { force: true });
+    await prisma.auditLog.create({
+      data: {
+        actorId: req.user!.id,
+        action: 'REVIEW_INVITE_SENT',
+        entity: 'Booking',
+        entityId: id,
+        meta: JSON.stringify({ channel: result.channel }),
+      },
+    });
+    res.json(result);
   }),
 );
 

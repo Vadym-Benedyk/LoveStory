@@ -5,9 +5,43 @@ import { validate } from '../../middleware/validate.js';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
 import { NotFound } from '../../lib/errors.js';
 import { prisma } from '../../lib/prisma.js';
+import { reviewSubmitLimiter } from '../../middleware/rate-limit.js';
+import { getInvite, submitInvitedReview } from './review-invite.service.js';
 
 // Review moderation. Nothing is public until APPROVED (public GET /reviews filters on it).
 export const REVIEW_STATUSES = ['PENDING', 'APPROVED', 'HIDDEN'] as const;
+
+// ---- Public: the invitation link (/review/<token> on the site). There is no open review form:
+// a review can only be left through the link a guest gets after their stay. ----
+export const publicReviewsRouter = Router();
+
+const tokenParam = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/) });
+
+publicReviewsRouter.get(
+  '/reviews/invite/:token',
+  validate({ params: tokenParam }),
+  asyncHandler(async (req, res) => {
+    res.json(await getInvite(req.params.token as string));
+  }),
+);
+
+publicReviewsRouter.post(
+  '/reviews/invite/:token',
+  reviewSubmitLimiter,
+  validate({
+    params: tokenParam,
+    body: z.object({
+      authorName: z.string().trim().min(2).max(60).optional(),
+      rating: z.coerce.number().int().min(1).max(5),
+      title: z.string().trim().max(160).optional(),
+      body: z.string().trim().min(5).max(2000),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const review = await submitInvitedReview(req.params.token as string, req.body);
+    res.status(201).json({ id: review.id, status: review.status });
+  }),
+);
 
 export const adminReviewsRouter = Router();
 // Moderation is an OWNER + MANAGER task (docs/product-design.md role table).
@@ -23,6 +57,7 @@ adminReviewsRouter.get(
         where: status ? { status } : {},
         // Pending first so the queue is on top in the "all" view, newest first within.
         orderBy: [{ createdAt: 'desc' }],
+        include: { booking: { select: { reference: true, checkIn: true, checkOut: true } } },
       }),
       prisma.review.groupBy({ by: ['status'], _count: { _all: true } }),
     ]);

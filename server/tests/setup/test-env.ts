@@ -16,6 +16,8 @@ export const TEST_ENV: Record<string, string> = {
   PENDING_EXPIRY_DAYS: '7',
   DEFAULT_CURRENCY: 'UAH',
   SMTP_URL: '',
+  NOTIFY_EMAIL: '',
+  NOTIFY_FROM: '',
   TELEGRAM_BOT_TOKEN: '',
   TELEGRAM_CHAT_ID: '',
   S3_BUCKET: '',

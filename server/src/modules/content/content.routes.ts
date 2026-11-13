@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { asyncHandler } from '../../lib/async-handler.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
-import { reviewSubmitLimiter } from '../../middleware/rate-limit.js';
 import { prisma } from '../../lib/prisma.js';
 import { toPublicSettings } from '../settings/settings.routes.js';
 import { readHeroOverlay } from '../media/hero-overlay.js';
@@ -80,12 +79,17 @@ publicContentRouter.get(
         stayMonth: true,
         ownerReply: true,
         createdAt: true,
+        bookingId: true,
       },
     });
     const avg = reviews.length
       ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
       : null;
-    res.json({ reviews, summary: { count: reviews.length, average: avg } });
+    res.json({
+      // `verified`: the review came through the invitation link of a real stay.
+      reviews: reviews.map(({ bookingId, ...r }) => ({ ...r, verified: bookingId !== null })),
+      summary: { count: reviews.length, average: avg },
+    });
   }),
 );
 
@@ -98,26 +102,6 @@ publicContentRouter.get(
       prisma.includedItem.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] }),
     ]);
     res.json({ rules, addons, included });
-  }),
-);
-
-publicContentRouter.post(
-  '/reviews',
-  reviewSubmitLimiter,
-  validate({
-    body: z.object({
-      authorName: z.string().min(2).max(120),
-      rating: z.coerce.number().int().min(1).max(5),
-      title: z.string().max(160).optional(),
-      body: z.string().min(5).max(2000),
-      stayMonth: z.string().max(40).optional(),
-      website: z.string().max(0).optional(), // honeypot
-    }),
-  }),
-  asyncHandler(async (req, res) => {
-    const { website, ...data } = req.body;
-    const review = await prisma.review.create({ data: { ...data, status: 'PENDING' } });
-    res.status(201).json({ id: review.id, status: review.status, message: 'Thanks! Your review is pending moderation.' });
   }),
 );
 

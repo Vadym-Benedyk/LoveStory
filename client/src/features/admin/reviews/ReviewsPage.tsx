@@ -1,4 +1,4 @@
-import { useFormatDate } from '@/i18n/DateLocaleProvider';
+import { useFormatDate, useFormatStayMonth } from '@/i18n/DateLocaleProvider';
 import { useState } from 'react';
 import {
   Box,
@@ -40,6 +40,7 @@ export function ReviewsPage() {
   const { t } = useLanguage();
   const toast = useToast();
   const fmtDate = useFormatDate();
+  const fmtStayMonth = useFormatStayMonth();
   // Moderation queue first: that's what the owner comes here for.
   const [filter, setFilter] = useState<Filter>('PENDING');
   const { data, isLoading } = useAdminReviews(filter === 'ALL' ? undefined : filter);
@@ -121,10 +122,18 @@ export function ReviewsPage() {
                 {r.body}
               </Typography>
               <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-                {[r.authorName, r.stayMonth, t('admin.reviews.submitted', { date: fmtDate(r.createdAt) })]
+                {[r.authorName, r.stayMonth && fmtStayMonth(r.stayMonth), t('admin.reviews.submitted', { date: fmtDate(r.createdAt) })]
                   .filter(Boolean)
                   .join(' · ')}
               </Typography>
+              {r.booking && (
+                <Typography variant="caption" color="success.main" display="block">
+                  {t('admin.reviews.verified', {
+                    dates: `${fmtDate(r.booking.checkIn)} – ${fmtDate(r.booking.checkOut)}`,
+                    reference: r.booking.reference,
+                  })}
+                </Typography>
+              )}
 
               {r.ownerReply && (
                 <Box sx={{ mt: 2, p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}>

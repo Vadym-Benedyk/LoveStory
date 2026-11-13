@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  LoveStory - sending email from the site through Amazon SES: the verified domain (DKIM, custom MAIL FROM,
+  DMARC) and the IAM user whose key becomes the SMTP login (see docs/deployment-decision.md)
+
+# Deploy in eu-central-1 (next to the server). It does not depend on the other stacks.
+# Not in this template, on purpose: the IAM access key and the SMTP password derived from it (a key made
+# by a stack would be readable in the stack; see infra/README.md), the request to leave the SES sandbox
+# (made by hand once the site is up), and the mailbox of the owner (iCloud Custom Email Domain, which
+# needs its own MX / SPF / DKIM records at the root of the domain).
+#
+# The SPF record for SES lives on the MAIL FROM subdomain (mail.<domain>), not at the root, so it does not
+# collide with the root SPF record that iCloud mail asks for.
+
+Parameters:
+  DomainName:
+    Type: String
+    Description: Apex domain of the site, for example example.com
+    AllowedPattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$
+  HostedZoneId:
+    Type: String
+    Default: ""
+    Description: >-
+      Route 53 hosted zone of the domain. When set, the DKIM, MAIL FROM and DMARC records are created in
+      it. Empty means the DNS is elsewhere and you create them by hand (see the DnsRecordsToCreate output).
+  MailFromSubdomain:
+    Type: String
+    Default: mail
+    Description: Subdomain used as the envelope sender (MAIL FROM); it must not receive any other mail
+    AllowedPattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$
+
+Conditions:
+  HasHostedZone: !Not [!Equals [!Ref HostedZoneId, ""]]
+
+Resources:
+  # The domain identity: with it any address @<domain> may be used as the sender.
+  Identity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref DomainName
+      DkimAttributes:
+        SigningEnabled: true
+      DkimSigningAttributes:
+        NextSigningKeyLength: RSA_2048_BIT
+      MailFromAttributes:
+        MailFromDomain: !Sub ${MailFromSubdomain}.${DomainName}
+        # If the MX record is ever missing, send with Amazon's own MAIL FROM instead of failing.
+        BehaviorOnMxFailure: USE_DEFAULT_VALUE
+      FeedbackAttributes:
+        EmailForwardingEnabled: true
+
+  # ---------------------------------------------------------------- DNS (only with a Route 53 zone)
+  DnsRecords:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: HasHostedZone
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        # Easy DKIM: three CNAMEs, the keys stay with SES and rotate by themselves.
+        - Name: !GetAtt Identity.DkimDNSTokenName1
+          Type: CNAME
+          TTL: "300"
+          ResourceRecords: [!GetAtt Identity.DkimDNSTokenValue1]
+        - Name: !GetAtt Identity.DkimDNSTokenName2
+          Type: CNAME
+          TTL: "300"
+          ResourceRecords: [!GetAtt Identity.DkimDNSTokenValue2]
+        - Name: !GetAtt Identity.DkimDNSTokenName3
+          Type: CNAME
+          TTL: "300"
+          ResourceRecords: [!GetAtt Identity.DkimDNSTokenValue3]
+        # Custom MAIL FROM: bounces come back to SES and SPF aligns with the From domain (DMARC).
+        # Exactly one MX record may exist on this name.
+        - Name: !Sub ${MailFromSubdomain}.${DomainName}
+          Type: MX
+          TTL: "300"
+          ResourceRecords:
+            - !Sub 10 feedback-smtp.${AWS::Region}.amazonses.com
+        - Name: !Sub ${MailFromSubdomain}.${DomainName}
+          Type: TXT
+          TTL: "300"
+          ResourceRecords:
+            - '"v=spf1 include:amazonses.com ~all"'
+        # DMARC in monitoring mode: nothing is rejected or quarantined, receivers just know the policy.
+        - Name: !Sub _dmarc.${DomainName}
+          Type: TXT
+          TTL: "300"
+          ResourceRecords:
+            - '"v=DMARC1; p=none;"'
+
+  # The SMTP login of the API. Its access key is created by hand (infra/README.md) and converted to an
+  # SMTP password. It can only send, only from this domain's identity, only as an address @<domain>.
+  SmtpUser:
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        - PolicyName: send-from-domain
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ses:SendRawEmail
+                # Any identity of this account, not only the domain: in the sandbox SES also checks the
+                # permission on the *recipient's* verified identity (found out by sending to the owner's
+                # address). The sender stays limited by the condition below.
+                Resource: !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/*
+                Condition:
+                  StringLike:
+                    ses:FromAddress: !Sub "*@${DomainName}"
+
+Outputs:
+  SmtpEndpoint:
+    Description: Host of the SMTP interface (port 465 with TLS, or 587 with STARTTLS)
+    Value: !Sub email-smtp.${AWS::Region}.amazonaws.com
+  SmtpUserName:
+    Description: Create its access key, convert the secret to the SMTP password, and put both into SMTP_URL
+    Value: !Ref SmtpUser
+  MailFromDomain:
+    Value: !Sub ${MailFromSubdomain}.${DomainName}
+  DnsRecordsToCreate:
+    Description: What to create at your DNS provider (already created by this stack when HostedZoneId is set)
+    Value: !Sub "DKIM: CNAME ${Identity.DkimDNSTokenName1} -> ${Identity.DkimDNSTokenValue1}, ${Identity.DkimDNSTokenName2} -> ${Identity.DkimDNSTokenValue2}, ${Identity.DkimDNSTokenName3} -> ${Identity.DkimDNSTokenValue3}; MAIL FROM: MX ${MailFromSubdomain}.${DomainName} -> 10 feedback-smtp.${AWS::Region}.amazonses.com, TXT ${MailFromSubdomain}.${DomainName} -> v=spf1 include:amazonses.com ~all; DMARC: TXT _dmarc.${DomainName} -> v=DMARC1; p=none;"

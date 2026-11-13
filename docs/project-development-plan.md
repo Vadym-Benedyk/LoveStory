@@ -398,7 +398,7 @@ Critical path: **E1 → E2 → E6 → E9 → E10.** Protect E6; it gates launch.
 - Gallery video; promo video on home.
 - Guest confirmation emails; Telegram/SMS notifications.
 - Pending auto-expiry job; audit log UI.
-- Public review-submission form.
+- ~~Public review-submission form~~ → done as invitation links after a stay (2026-11-13, see product-design §6 Review).
 
 ### Future enhancements
 - Online deposit/payment + deposit-on-confirm.

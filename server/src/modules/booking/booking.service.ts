@@ -288,6 +288,7 @@ export async function listBookings(status?: string, period?: BookingPeriod) {
       addons: { include: { addon: true } },
       appliedPromotion: true,
       confirmedBy: { select: { name: true, email: true } },
+      review: { select: { id: true, status: true, rating: true } },
     },
   });
 }

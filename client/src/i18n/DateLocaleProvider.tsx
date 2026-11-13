@@ -46,6 +46,18 @@ export function formatDateTime(value: string, lang: Lang): string {
   return dayjs(value).locale(lang).format(lang === 'uk' ? 'DD.MM.YYYY, HH:mm' : 'MMM D, YYYY, h:mm A');
 }
 
+// Month of a stay: "YYYY-MM" (set by the server for invited reviews) → "серпень 2026" / "August 2026".
+// Anything else (free text of imported reviews) is shown as it is.
+export function formatStayMonth(value: string, lang: Lang): string {
+  if (!/^\d{4}-\d{2}$/.test(value)) return value;
+  return dayjs(`${value}-01`).locale(lang).format('MMMM YYYY');
+}
+
+export function useFormatStayMonth() {
+  const { lang } = useLanguage();
+  return useCallback((value: string) => formatStayMonth(value, lang), [lang]);
+}
+
 export function useFormatDateTime() {
   const { lang } = useLanguage();
   return useCallback((value: string) => formatDateTime(value, lang), [lang]);

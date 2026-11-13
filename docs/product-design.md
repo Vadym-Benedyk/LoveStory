@@ -215,7 +215,7 @@ New request arrives → admin notified
 | Gallery | Upload (drag-drop), set category + alt text, reorder, set hero image, delete; mark a video. |
 | Promotions | Create/edit/delete offers: title, body, image, discount, validity window, active toggle. |
 | Pricing | Edit base/weekday/weekend rates, add seasonal overrides (date ranges), manage add-ons, min-stay rules. |
-| Reviews | Moderate: approve / hide / delete, optional owner reply. Nothing publishes unapproved. |
+| Reviews | Moderate: approve / hide / delete, optional owner reply. Nothing publishes unapproved. Verified reviews show their booking; invitations are managed from the booking panel. |
 | Settings | Property details, capacity, contact channels, notification targets, account/password. |
 
 ### Admin UX principles
@@ -296,8 +296,14 @@ back to BASE. (Engine lives in a `pricing` domain module — testable in isolati
 
 **Review**
 `id, authorName, rating (1–5), title?, body, stayMonth?, status (PENDING|APPROVED|HIDDEN), ownerReply?, source (WEBSITE|IMPORTED|SOCIAL), approvedAt?, approvedBy? → User`
-*Trust:* only `APPROVED` is public. Social-login collection is a future source; MVP collects via
-form + manual moderation.
+`bookingId? → Booking` (set when the review came through a stay's invitation: a **verified stay**)
+*Trust:* only `APPROVED` is public, and there is **no open review form**. A guest gets a one-off link
+(`/review/<token>`, valid 60 days, one review per booking) after check-out: the hourly server job
+creates it for every confirmed stay and emails it to the guest when they left an address (SMTP
+configured), otherwise sends it to the owner's Telegram / email to forward by hand; the booking panel
+in the admin shows the link, the channel and a "send again" button. The page prefills the guest's
+first name (editable; only a name is ever shown on the site) and sets `stayMonth` to the check-in
+month. Every new review notifies the owner. Social-login collection is a future source.
 
 **Media** — gallery photos + optional video
 ```

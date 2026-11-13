@@ -6,6 +6,7 @@ import { HomePage } from '@/features/public/home/HomePage';
 import { AllPhotosPage } from '@/features/public/gallery/AllPhotosPage';
 import { BookingPage } from '@/features/public/booking/BookingPage';
 import { TermsPage } from '@/features/public/terms/TermsPage';
+import { ReviewInvitePage } from '@/features/public/review/ReviewInvitePage';
 
 // Admin is a separate code-split bundle — never shipped to public visitors.
 const AdminApp = lazy(() => import('@/features/admin/AdminApp'));
@@ -31,6 +32,7 @@ export function App() {
         <Route path="/gallery" element={<AllPhotosPage />} />
         <Route path="/booking" element={<BookingRoute />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/review/:token" element={<ReviewInvitePage />} />
       </Route>
       <Route
         path="/admin/*"

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './client';
 import { useLanguage } from '@/i18n/LanguageContext';
-import type { GalleryResponse, PublicReview, SiteContent, UnavailableRange } from '@/shared/types';
+import type { GalleryResponse, PublicReview, ReviewInvite, SiteContent, UnavailableRange } from '@/shared/types';
 
 // Editable site copy comes in the current site language (ContentBlock per locale).
 export const useSiteContent = () => {
@@ -74,4 +74,12 @@ export const useAvailability = (from: string, to: string) =>
       (await api.get('/availability', { params: { from, to } })).data as {
         unavailable: UnavailableRange[];
       },
+  });
+
+// The review invitation a guest got after their stay (/review/:token). 404 = unknown token.
+export const useReviewInvite = (token: string) =>
+  useQuery({
+    queryKey: ['review-invite', token],
+    queryFn: async () => (await api.get<ReviewInvite>(`/reviews/invite/${token}`)).data,
+    retry: false,
   });

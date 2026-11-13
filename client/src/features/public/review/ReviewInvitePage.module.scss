@@ -1,0 +1,15 @@
+@use '@/styles/tokens' as t;
+
+.page {
+  padding-block: t.$space-section;
+}
+
+.card {
+  padding: 2rem 1.5rem;
+  background: t.$sand;
+  border-radius: t.$radius;
+
+  @include t.up(t.$bp-md) {
+    padding: 3rem;
+  }
+}

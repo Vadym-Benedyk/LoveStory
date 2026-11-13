@@ -53,7 +53,8 @@ describe('direct connection (TRUST_PROXY=0)', () => {
 
     // Other public endpoints keep their own budgets.
     expect(await post(srv, '/quote', { checkIn: day(10), checkOut: day(12) })).toBe(200);
-    expect(await post(srv, '/reviews', { authorName: 'Guest', rating: 5, body: 'Lovely place' })).toBe(201);
+    // (an unknown invitation token is 404, not 429: the review budget is untouched)
+    expect(await post(srv, '/reviews/invite/not-a-real-token-0000', { rating: 5, body: 'Lovely place' })).toBe(404);
   });
 });
 
