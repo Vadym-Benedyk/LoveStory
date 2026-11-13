@@ -1,0 +1,66 @@
+# Every push to main: checks (types, lint, tests, client build), then the release of the API on the
+# Lightsail server (deploy/release.sh, over SSH with a key that can only run that script).
+#
+# The site itself (S3 + CloudFront, infra/deploy-client.sh) is not published here yet: the CloudFront
+# stack does not exist. Add a job for it once it does.
+#
+# Secrets, in the `production` environment of the repository (Settings > Environments):
+#   DEPLOY_HOST         address of the server (the static IP)
+#   DEPLOY_SSH_KEY      private key whose public half is the forced-command entry on the server
+#   DEPLOY_KNOWN_HOSTS  the server's host key line(s), so the connection is checked, not trusted blindly
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One release at a time, in push order; a newer push waits instead of cancelling a release half-way.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      # prisma.config.ts wants a DATABASE_URL even to generate the client; the tests use their own file.
+      - run: npm --workspace server run prisma:generate
+        env:
+          DATABASE_URL: file:/tmp/ci-generate.db
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build:client
+
+  deploy-api:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://api.lovestory.vin/api/health
+    steps:
+      - name: Release on the server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The server runs deploy/release.sh whatever is asked; the argument is the commit to release.
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes -o ServerAliveInterval=30 \
+            "ubuntu@$DEPLOY_HOST" "$GITHUB_SHA"

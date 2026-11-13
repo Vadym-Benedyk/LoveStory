@@ -36,7 +36,8 @@ Wiring:
   to S3). Test a restore on a clean machine once.
 - S3 access: an IAM user limited to the media bucket, keys in the server's `.env`. Lightsail instance
   IAM roles are reported as unavailable (community answer, not confirmed in the official docs).
-- Release: `git pull`, `docker compose build`, `prisma:push` through the `tools` service, `docker
+- Release: a push to `main` runs GitHub Actions (checks, then `deploy/release.sh` on the server over SSH
+  with a forced-command key; set up 2026-11-13). By hand: `git pull`, `docker compose build`, `prisma:push` through the `tools` service, `docker
   compose up -d` (or build elsewhere and pull, with `API_IMAGE`). Runbook:
   [`deploy/README.md`](../deploy/README.md). The image builds for both `linux/amd64` and
   `linux/arm64`. The API is down for a few seconds during a redeploy (single SQLite writer); the

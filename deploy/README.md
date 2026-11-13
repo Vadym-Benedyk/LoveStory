@@ -32,6 +32,26 @@ Then delete `OWNER_PASSWORD` from `.env` and run `docker compose up -d --force-r
 
 ## Release
 
+**Automatic (normal way):** merge `dev` into `main` and push. GitHub Actions
+([`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)) runs the checks (types, lint, tests,
+client build) and then connects to the server with a deploy key that can only run
+[`release.sh`](release.sh): backup, checkout of that commit, build, `prisma:push`, container swap, health
+check. A failed step leaves the running API as it was; the log of each release is in
+`~/lovestory-release.log` and in the Actions run. The key, the server address and its host key are secrets
+of the `production` environment of the repository, which only `main` may use.
+
+The deploy key's line in `~/.ssh/authorized_keys` (the public half; the private half is only in the
+GitHub secret):
+
+```
+command="/opt/lovestory/deploy/release.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA... github-actions-lovestory
+```
+
+To replace the key: generate a new pair, swap that line, `gh secret set DEPLOY_SSH_KEY --env production`.
+`release.sh check` (or `ssh -i <key> ubuntu@<server> check`) tests the connection without deploying.
+
+**By hand** (the same steps, for example when `prisma:push` stopped a release):
+
 ```bash
 cd /opt/lovestory && git pull && cd deploy
 docker compose build
