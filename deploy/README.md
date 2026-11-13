@@ -6,7 +6,8 @@ The site itself (S3 + CloudFront) is not part of this; only `api.<domain>` runs 
 
 ## One-time setup
 
-1. Create the instance (Frankfurt, Linux, the 2 GB bundle with a public IPv4) and attach a **static IP**;
+1. Create the instance (Frankfurt, Linux, the 2 GB bundle with a public IPv4; 1 GB works too, see the
+   measurements in the decision record) and attach a **static IP**;
    [`infra/`](../infra/README.md) does this, and the rest of the AWS side, with CloudFormation. Firewall:
    80 and 443 open to everyone, SSH (22) key-only (restrict it to your IP if you can).
 2. DNS: an A record `api.<domain>` pointing at the static IP.
@@ -53,8 +54,15 @@ crontab -e
 15 3 * * * /opt/lovestory/deploy/backup.sh >> ~/lovestory-backup.log 2>&1
 ```
 
-It keeps the last 7 dumps in `deploy/backups/`. Set `BACKUP_S3_URI=s3://<bucket>/<prefix>` in the
-crontab line to upload each dump too (and add an S3 lifecycle rule to expire old ones).
+It keeps the last 7 dumps in `deploy/backups/`. To upload each dump too, install the AWS CLI
+(`sudo snap install aws-cli --classic`), put the backup user's key in `~/.aws/credentials`, and set the
+bucket in the crontab line (cron does not have `/snap/bin` on its `PATH`):
+
+```bash
+15 3 * * * PATH=/usr/bin:/bin:/snap/bin BACKUP_S3_URI=s3://<bucket>/lovestory /opt/lovestory/deploy/backup.sh >> ~/lovestory-backup.log 2>&1
+```
+
+The bucket from `infra/server.yml` already expires old dumps (30 days by default).
 
 Restore:
 

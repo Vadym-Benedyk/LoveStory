@@ -1,0 +1,227 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  LoveStory - the Lightsail instance that runs the API, its static IP, the api DNS record and the bucket
+  for database backups (see docs/deployment-decision.md)
+
+# Deploy in eu-central-1. It does not depend on certificate.yml or app.yml (Caddy on the instance gets its
+# own Let's Encrypt certificate), so the API can go up before the site. See infra/README.md.
+# Not in this template, on purpose: IAM access keys (a key created by a stack would be readable in the
+# stack) and the Docker/Caddy setup on the server (deploy/).
+
+Parameters:
+  DomainName:
+    Type: String
+    Description: Apex domain of the site, for example example.com
+    AllowedPattern: ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$
+  HostedZoneId:
+    Type: String
+    Default: ""
+    Description: >-
+      Route 53 hosted zone of the domain. When set, the api.<domain> record is created in it. Empty means
+      the DNS is elsewhere and you create the record by hand (see the StaticIpAddress output).
+  InstanceName:
+    Type: String
+    Default: lovestory-api
+    Description: Lightsail instance name. A new name means a new instance with an empty disk.
+  AvailabilityZone:
+    Type: String
+    Default: eu-central-1a
+    Description: Availability zone of the Lightsail instance
+  BundleId:
+    Type: String
+    Default: small_3_0
+    Description: >-
+      Lightsail bundle. small_3_0 is 2 GB RAM / 2 vCPU / 60 GB SSD / 3 TB transfer with a public IPv4;
+      micro_3_0 is 1 GB / 2 vCPU / 40 GB / 2 TB. New AWS accounts may be refused the bigger ones.
+      A bundle cannot be changed later by updating the stack (see infra/README.md).
+  BlueprintId:
+    Type: String
+    Default: ubuntu_24_04
+    Description: >-
+      Lightsail OS image. Check the exact ID before deploying:
+      aws lightsail get-blueprints --region eu-central-1 --query "blueprints[?type=='os'].[blueprintId,name]" --output text
+  KeyPairName:
+    Type: String
+    Default: ""
+    Description: Lightsail key pair for SSH. Empty means the regional default key pair.
+  SshCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: Who may reach SSH (port 22), in CIDR notation. Use your own address (x.x.x.x/32) if you can.
+    AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$
+  BackupRetentionDays:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    Description: Database backups in the backup bucket are deleted after this many days
+
+Conditions:
+  HasKeyPair: !Not [!Equals [!Ref KeyPairName, ""]]
+  HasHostedZone: !Not [!Equals [!Ref HostedZoneId, ""]]
+
+Resources:
+  # ---------------------------------------------------------------- database backups
+  # Database dumps hold guests' names and phone numbers: private, and old ones expire.
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-backups
+            Status: Enabled
+            ExpirationInDays: !Ref BackupRetentionDays
+          - Id: abort-incomplete-uploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  BackupBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BackupBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: HttpsOnly
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !GetAtt BackupBucket.Arn
+              - !Sub ${BackupBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+  # Create its access key by hand (infra/README.md); the key is not part of the stack.
+  BackupUser:
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        - PolicyName: backup-bucket
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:AbortMultipartUpload
+                Resource: !Sub ${BackupBucket.Arn}/*
+
+  # ---------------------------------------------------------------- Lightsail
+  Instance:
+    Type: AWS::Lightsail::Instance
+    Properties:
+      InstanceName: !Ref InstanceName
+      BlueprintId: !Ref BlueprintId
+      BundleId: !Ref BundleId
+      AvailabilityZone: !Ref AvailabilityZone
+      KeyPairName: !If [HasKeyPair, !Ref KeyPairName, !Ref "AWS::NoValue"]
+      Networking:
+        # All ports to open must be listed here, the defaults are not kept.
+        Ports:
+          - Protocol: tcp
+            FromPort: 80
+            ToPort: 80
+            Cidrs: [0.0.0.0/0]
+            Ipv6Cidrs: ["::/0"]
+          - Protocol: tcp
+            FromPort: 443
+            ToPort: 443
+            Cidrs: [0.0.0.0/0]
+            Ipv6Cidrs: ["::/0"]
+          - Protocol: tcp
+            FromPort: 22
+            ToPort: 22
+            Cidrs: [!Ref SshCidr]
+      AddOns:
+        # Daily snapshot of the whole instance, the last 7 are kept; time in UTC, HH:00.
+        - AddOnType: AutoSnapshot
+          Status: Enabled
+          AutoSnapshotAddOnRequest:
+            SnapshotTimeOfDay: "02:00"
+      # Runs once, when the instance is first created (changing it later does not run it again).
+      # Lightsail appends this to its own launch script, which runs under /bin/sh (dash on Ubuntu): no
+      # shebang of our own, and POSIX sh only (`set -o pipefail` aborted the whole script here).
+      UserData: |
+        set -eux
+        export DEBIAN_FRONTEND=noninteractive
+
+        # 2 GB of swap: building the Docker image on a 1-2 GB machine can run out of memory without it.
+        if [ ! -f /swapfile ]; then
+          fallocate -l 2G /swapfile
+          chmod 600 /swapfile
+          mkswap /swapfile
+          swapon /swapfile
+          echo '/swapfile none swap sw 0 0' >> /etc/fstab
+        fi
+
+        apt-get update
+        apt-get install -y ca-certificates curl git sqlite3
+
+        # Docker Engine from Docker's own apt repository (Docker's install steps for Ubuntu).
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+        cat > /etc/apt/sources.list.d/docker.sources <<EOF
+        Types: deb
+        URIs: https://download.docker.com/linux/ubuntu
+        Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+        Components: stable
+        Architectures: $(dpkg --print-architecture)
+        Signed-By: /etc/apt/keyrings/docker.asc
+        EOF
+        apt-get update
+        apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        systemctl enable --now docker
+
+        # The login user of the Ubuntu image may run docker without sudo; the repo goes in /opt/lovestory.
+        usermod -aG docker ubuntu || true
+        mkdir -p /opt/lovestory
+        chown ubuntu:ubuntu /opt/lovestory || true
+
+  StaticIp:
+    Type: AWS::Lightsail::StaticIp
+    DependsOn: Instance
+    Properties:
+      StaticIpName: !Sub ${InstanceName}-ip
+      AttachedTo: !Ref InstanceName
+
+  # ---------------------------------------------------------------- DNS (only with a Route 53 zone)
+  ApiDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasHostedZone
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub api.${DomainName}
+      Type: A
+      TTL: "300"
+      ResourceRecords:
+        - !GetAtt StaticIp.IpAddress
+
+Outputs:
+  InstanceName:
+    Value: !Ref InstanceName
+  StaticIpAddress:
+    Description: A record for api.<domain> (already created by this stack when HostedZoneId is set)
+    Value: !GetAtt StaticIp.IpAddress
+  BackupBucketName:
+    Description: BACKUP_S3_URI=s3://<this bucket>/lovestory for deploy/backup.sh
+    Value: !Ref BackupBucket
+  BackupUserName:
+    Description: Create its access key for the AWS CLI that backup.sh uses on the server
+    Value: !Ref BackupUser

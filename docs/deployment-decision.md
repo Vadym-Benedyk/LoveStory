@@ -59,18 +59,44 @@ Not done yet / still to decide:
 
 ## AWS resources as code: `infra/`
 
-The AWS side is described in two CloudFormation templates (runbook in
+The AWS side is described in three CloudFormation templates (runbook in
 [`infra/README.md`](../infra/README.md)): `certificate.yml` (us-east-1: the ACM certificate, which
-CloudFront only reads from there) and `app.yml` (eu-central-1: the site, photo and backup buckets, both
-CloudFront distributions with origin access control, the two IAM users, the Lightsail instance with its
-firewall, daily snapshots and a launch script that installs Docker, and the static IP). DNS records, IAM
-access keys and the app setup on the server stay outside the templates.
+CloudFront only reads from there), `server.yml` (eu-central-1: the Lightsail instance with its firewall,
+daily snapshots and a launch script that installs Docker, the static IP, the `api.` record, the backup
+bucket and its IAM user) and `app.yml` (eu-central-1: the site and photo buckets, both CloudFront
+distributions with origin access control, their DNS records and the IAM user for photos). The server is a
+separate stack so that the CloudFront side cannot roll it back. The DNS zone, IAM access keys and the app
+setup on the server stay outside the templates.
 
-Status: both pass `cfn-lint`; neither has been deployed. Not confirmed in the docs: that CloudFront
-distributions can be created from a eu-central-1 stack (the certificate is passed in by ARN because stack
-outputs cannot be referenced across regions), and the exact Lightsail blueprint ID (`ubuntu_24_04` is the
-default; the README shows how to check it). A replaced Lightsail instance starts with an empty disk, so
-every stack change that replaces it needs a restore from backup.
+Status on 2026-11-11, account 488571556295: the certificate is issued and the server stack is deployed.
+The new account was refused the 2 GB bundle (Support: an account maturity rule, ask again after 2-3 billing
+cycles), so the instance is **`micro_3_0`: 1 GB RAM / 2 vCPU / 40 GB / 2 TB, $7 a month** (x86-64).
+Measured on it: building both images takes 155 s and peaks at about 810 MB of RAM plus 625 MB of the 2 GB
+swap, with no out-of-memory kill; idle, the API uses about 70 MB and Caddy 14 MB. A 24-megapixel test
+photo (6000x4000 JPEG, synthetic, 4 MB) uploaded through the live API in 1.2 s; the API container was
+sampled at up to about 150 MB during it (coarse: three samples), with no swap growth. A real 15 MB camera
+photo and several uploads at once are not measured. Moving to 2 GB later means a new instance
+(from a snapshot, or a restore from backup); the fallback if 1 GB is too small before that is EC2
+`t4g.small` (about $20 a month). `app.yml` is not deployed: CloudFront refuses new resources until AWS
+Support verifies the account. Until then there is no site and no photo bucket.
+
+The API is live at `https://api.lovestory.vin` since 2026-11-11 (checked from outside: Let's Encrypt
+certificate, HTTP to HTTPS redirect, `/api/health`, CORS for `https://lovestory.vin`). Temporary settings
+in the server's `deploy/.env`: photos on the local disk (`STORAGE_DRIVER=local`, `UPLOADS_DIR=/data/uploads`,
+`UPLOADS_PUBLIC_URL=https://api.lovestory.vin/uploads`); photos uploaded now have to be moved and their URLs
+updated when S3 arrives. `ACME_EMAIL` is a placeholder (`admin@lovestory.vin`). Since 2026-11-13 the
+owner account exists (seeded; its generated password is in `~/owner-password.txt` on the server until the
+owner changes it), and `backup.sh` runs nightly at 03:15 UTC from the `ubuntu` crontab, keeping 7 dumps in
+`deploy/backups/` on the server (a restore of the first dump passed the integrity check). Each dump is also
+uploaded to the backup bucket (checked: the file arrived; the backup user's key, stored in
+`~/.aws/credentials` on the server, can write there but cannot list or read). The AWS CLI on the server is
+the `aws-cli` snap, so the crontab line sets `PATH` to include `/snap/bin`. The seed also inserted its
+sample review ("Anna & Mark"), which should be removed in the admin before the site opens.
+
+The launch script (`UserData`) failed on the first boot: Lightsail appends it to its own `/bin/sh` script,
+where `set -o pipefail` is an error. Fixed in `server.yml` (POSIX sh, no shebang); the fixed script was run
+by hand on this instance and completed. It has not yet run by itself on a fresh instance. A replaced Lightsail instance starts with an empty disk, so every stack change that replaces
+it needs a restore from backup.
 
 ## DNS: Route 53 (decided 2026-11-10)
 
@@ -94,7 +120,7 @@ both must be in the single SPF record. Telegram notifications work without any o
 
 ## Cost (prices checked 2026-11-08, USD, without taxes)
 
-About **$13 per month**: Lightsail $12, Route 53 zone $0.50, S3 a few cents, CloudFront inside the always-free tier
+About **$8 per month** on the 1 GB instance ($13 with the planned 2 GB one): Lightsail $7 ($12), Route 53 zone $0.50, S3 a few cents, CloudFront inside the always-free tier
 (1 TB transfer, 10 M requests, 2 M function invocations per month). Not included: domain/DNS,
 snapshot storage (price not checked), traffic above the 3 TB bundle.
 

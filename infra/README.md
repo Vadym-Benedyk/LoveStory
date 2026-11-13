@@ -1,24 +1,32 @@
 # AWS resources (CloudFormation)
 
-Two templates describe the AWS side of [`docs/deployment-decision.md`](../docs/deployment-decision.md):
+Three templates describe the AWS side of [`docs/deployment-decision.md`](../docs/deployment-decision.md):
 
 | Template | Region | Creates |
 |---|---|---|
 | `certificate.yml` | us-east-1 | The ACM certificate for `<domain>`, `www.<domain>` and `cdn.<domain>` (CloudFront only reads certificates from us-east-1) |
-| `app.yml` | eu-central-1 | Three private S3 buckets (site, photos, database backups), two CloudFront distributions (site, photos), two IAM users (photos, backups), the Lightsail instance (2 GB, daily snapshots, firewall, Docker installed on first boot) and its static IP |
+| `server.yml` | eu-central-1 | The Lightsail instance (daily snapshots, firewall, Docker installed on first boot), its static IP, the `api.<domain>` record, the private bucket for database backups and its IAM user |
+| `app.yml` | eu-central-1 | Two private S3 buckets (site, photos), two CloudFront distributions in front of them, the site/`www`/`cdn` records and the IAM user for photos |
+
+The server is its own stack so that a failure or change on the CloudFront side never touches the instance
+that holds the database, and so the API can go up first.
 
 Not created on purpose: the DNS zone and, unless you pass `HostedZoneId`, the DNS records (any DNS provider
 works), IAM access keys (a key made by a stack is
 readable in the stack), and the app setup on the server (that is [`deploy/`](../deploy/README.md)).
 
-Status: both templates pass `cfn-lint`. `certificate.yml` is being deployed for `lovestory.vin` (started
-2026-11-10); `app.yml` has not been deployed yet. The Lightsail IDs `small_3_0` and `ubuntu_24_04` were
-confirmed in eu-central-1 on 2026-11-10.
+Status for `lovestory.vin` (2026-11-11): all three templates pass `cfn-lint`. `certificate.yml` is deployed
+(stack `lovestory-cert`, certificate issued). `server.yml` is deployed (stack `lovestory-server`, bundle
+`micro_3_0`, 1 GB). `app.yml` is **not** deployed: the new AWS account must be verified by AWS Support
+before it may create CloudFront distributions.
+
+Limits a new AWS account ran into here: the 2 GB Lightsail bundle `small_3_0` was refused (Support: ask
+again after 2-3 billing cycles), and CloudFront needs an account verification through a Support case.
 
 ## Before you start
 
 You need the AWS CLI configured for your account and a domain you can edit DNS for. Check the Lightsail IDs
-the template defaults to (`BundleId=small_3_0`, `BlueprintId=ubuntu_24_04`) in your region:
+`server.yml` defaults to (`BundleId=small_3_0`, `BlueprintId=ubuntu_24_04`) in your region:
 
 ```bash
 aws lightsail get-bundles --region eu-central-1 --query "bundles[].[bundleId,price,ramSizeInGb,cpuCount,diskSizeInGb]" --output table
@@ -55,22 +63,35 @@ name servers already. Without `HostedZoneId`: while it waits, open the certifica
 aws cloudformation describe-stacks --region us-east-1 --stack-name lovestory-cert --query "Stacks[0].Outputs" --output table
 ```
 
-## 2. Everything else
+## 2. The server, then the site
+
+The server stack needs neither the certificate nor the site stack, so it can be deployed at any point:
+
+```bash
+aws cloudformation deploy --region eu-central-1 --stack-name lovestory-server \
+  --template-file infra/server.yml --capabilities CAPABILITY_IAM \
+  --parameter-overrides DomainName=example.com HostedZoneId=<zone ID> SshCidr=<your IP>/32
+aws cloudformation describe-stacks --region eu-central-1 --stack-name lovestory-server --query "Stacks[0].Outputs" --output table
+```
+
+Add `BundleId=micro_3_0` (1 GB, $7) if the account is refused the default 2 GB bundle. Then the site:
 
 ```bash
 aws cloudformation deploy --region eu-central-1 --stack-name lovestory \
   --template-file infra/app.yml --capabilities CAPABILITY_IAM \
-  --parameter-overrides DomainName=example.com CertificateArn=<arn from step 1> HostedZoneId=<zone ID> SshCidr=<your IP>/32
+  --parameter-overrides DomainName=example.com CertificateArn=<arn from step 1> HostedZoneId=<zone ID>
 aws cloudformation describe-stacks --region eu-central-1 --stack-name lovestory --query "Stacks[0].Outputs" --output table
 ```
 
-Keep the stack name `lovestory`: the instance and static IP names derive from it. To look at the changes
-before they are applied, add `--no-execute-changeset`.
+Keep the site stack name `lovestory`: `deploy-client.sh` reads its outputs under that name. To look at the
+changes before they are applied, add `--no-execute-changeset`. A stack that failed on its first deploy
+stays in `ROLLBACK_COMPLETE` and has to be deleted before the next try (`aws cloudformation delete-stack`);
+the buckets it had already created are kept and have to be removed by hand.
 
 ## 3. DNS
 
-Skip this with `HostedZoneId`: the stack has created the records. Otherwise the `DnsRecordsToCreate` output
-lists what to create:
+Skip this with `HostedZoneId`: the stacks have created the records. Otherwise the `DnsRecordsToCreate` output
+of the site stack and `StaticIpAddress` of the server stack say what to create:
 
 - `<domain>` and `www.<domain>`: ALIAS/CNAME to the site distribution (an apex domain needs a DNS provider
   that supports ALIAS or CNAME flattening, for example Route 53 or Cloudflare).
@@ -82,8 +103,8 @@ lists what to create:
 Create them by hand, they are shown once:
 
 ```bash
-aws iam create-access-key --user-name <MediaUserName output>
-aws iam create-access-key --user-name <BackupUserName output>
+aws iam create-access-key --user-name <MediaUserName output of the site stack>
+aws iam create-access-key --user-name <BackupUserName output of the server stack>
 ```
 
 The first goes into `deploy/.env` (`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, plus `S3_BUCKET` =
@@ -92,7 +113,9 @@ server, for `deploy/backup.sh` with `BACKUP_S3_URI=s3://<BackupBucketName>/loves
 
 ## 5. The server
 
-Log in over SSH with the Lightsail key and continue with [`deploy/README.md`](../deploy/README.md) from
+Get the regional default key once (`aws lightsail download-default-key-pair --region eu-central-1 --query
+privateKeyBase64 --output text > ~/.ssh/lightsail.pem`, then `chmod 600`), log in with
+`ssh -i ~/.ssh/lightsail.pem ubuntu@<static IP>` and continue with [`deploy/README.md`](../deploy/README.md) from
 the clone step. Docker, git and sqlite3 are installed by the launch script on first boot; if `docker` is
 missing, look at `/var/log/cloud-init-output.log`.
 
