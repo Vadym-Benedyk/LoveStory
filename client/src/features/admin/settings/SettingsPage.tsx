@@ -3,6 +3,7 @@ import { Alert, Box, Button, Checkbox, FormControlLabel, Paper, Stack, TextField
 import type { AdminSettings } from '@/shared/types';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useToast } from '@/shared/ui/ToastProvider';
+import { PasswordField } from '@/shared/ui/PasswordField';
 import { PhoneMaskInput, formatUaPhone, isCompleteUaPhone, isEmptyPhone, phoneToDigits } from '@/shared/ui/PhoneMaskInput';
 import { useAuth } from '../auth/AuthContext';
 import { useAdminSettings, useChangePassword, useSaveSettings } from '../api';
@@ -82,7 +83,6 @@ function SiteSettingsForm() {
     if (phoneInvalid) return;
     save.mutate({
       capacity: Number(form.capacity),
-      // Untouched: keep what is stored (may be an older free-text number the mask can't hold).
       phone: phoneUntouched ? (data?.phone ?? '') : isEmptyPhone(form.phone) ? '' : formatUaPhone(form.phone),
       email: form.email,
       address: form.address,
@@ -106,8 +106,10 @@ function SiteSettingsForm() {
             label={t('admin.settings.phone')}
             type="tel"
             {...field('phone')}
-            InputProps={{ inputComponent: PhoneMaskInput as never }}
-            InputLabelProps={{ shrink: true }}
+            slotProps={{
+              input: { inputComponent: PhoneMaskInput as never },
+              inputLabel: { shrink: true },
+            }}
             error={phoneInvalid}
             helperText={phoneInvalid ? t('admin.settings.phoneInvalid') : undefined}
           />
@@ -154,7 +156,7 @@ function SiteSettingsForm() {
           <TextField
             label={t('admin.settings.capacity')}
             type="number"
-            inputProps={{ min: 1, max: 50 }}
+            slotProps={{ htmlInput: { min: 1, max: 50 } }}
             {...field('capacity')}
             fullWidth={false}
             sx={{ maxWidth: 220 }}
@@ -245,26 +247,23 @@ function ChangePasswordForm() {
   return (
     <Box component="form" onSubmit={onSubmit} noValidate>
       <Section title={t('admin.settings.password.title')} hint={t('admin.settings.password.hint')}>
-        <TextField
+        <PasswordField
           label={t('admin.settings.password.current')}
-          type="password"
           autoComplete="current-password"
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
           error={code === 'WRONG_PASSWORD'}
         />
-        <TextField
+        <PasswordField
           label={t('admin.settings.password.new')}
-          type="password"
           autoComplete="new-password"
           value={next}
           onChange={(e) => setNext(e.target.value)}
           error={tooShort}
           helperText={t('admin.settings.password.minLength')}
         />
-        <TextField
+        <PasswordField
           label={t('admin.settings.password.confirm')}
-          type="password"
           autoComplete="new-password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}

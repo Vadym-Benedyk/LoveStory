@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material';
 import { useAuth } from './AuthContext';
 import { useLanguage } from '@/i18n/LanguageContext';
+import { PasswordField } from '@/shared/ui/PasswordField';
 import { LanguageSwitcher } from '@/i18n/LanguageSwitcher';
 
 export function LoginPage() {
@@ -43,13 +44,14 @@ export function LoginPage() {
             <TextField
               label={t('admin.login.email')}
               type="email"
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <TextField
+            <PasswordField
               label={t('admin.login.password')}
-              type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
