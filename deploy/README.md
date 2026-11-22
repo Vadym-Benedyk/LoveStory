@@ -40,7 +40,7 @@ Then delete `OWNER_PASSWORD` from `.env` and run `docker compose up -d --force-r
 ## Release
 
 **Automatic (normal way):** merge `dev` into `main` and push. GitHub Actions
-([`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)) runs the checks (types, lint, tests,
+([`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)) runs the checks (types, tests,
 client build) and then connects to the server with a deploy key that can only run
 [`release.sh`](release.sh): backup, checkout of that commit, build, `prisma:push`, container swap, health
 check of the API and the site. A failed step leaves the running containers as they were; the log of each release is in

@@ -1,4 +1,4 @@
-# Every push to main: checks (types, lint, tests, client build), then the release of the site and the API
+# Every push to main: checks (types, tests, client build), then the release of the site and the API
 # on the Lightsail server (deploy/release.sh, over SSH with a key that can only run that script). The
 # client is built there, into the Caddy image (client/Dockerfile).
 #
@@ -40,7 +40,7 @@ jobs:
         env:
           DATABASE_URL: file:/tmp/ci-generate.db
       - run: npm run typecheck
-      - run: npm run lint
+      # No lint step yet: ESLint is not set up in the repo (no package, no config), so `npm run lint` fails.
       - run: npm test
       - run: npm run build:client
 
