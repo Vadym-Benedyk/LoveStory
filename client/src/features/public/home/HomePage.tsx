@@ -14,7 +14,7 @@ import { useFormatStayMonth } from '@/i18n/DateLocaleProvider';
 import { PhotoGrid } from '../gallery/PhotoGrid';
 import { HeroImage } from './HeroImage';
 import { PricingSection } from './PricingSection';
-import { textStyle } from './textStyle';
+import { loadTextFonts, textStyle } from './textStyle';
 import { useHeroTextParallax } from './useHeroTextParallax';
 import { useGallery, useReviews, useSiteContent } from '@/shared/api/queries';
 import { useLanguage } from '@/i18n/LanguageContext';
@@ -67,6 +67,10 @@ export function HomePage() {
     if (textReady) setTextShown(true);
   }, [textReady]);
   const showHeroText = textShown || textReady;
+  // Only the fonts chosen for the hero texts in the admin (if any) are fetched.
+  const headlineFont = data?.copy?.['hero.headline.font'];
+  const subheadlineFont = data?.copy?.['hero.subheadline.font'];
+  useEffect(() => loadTextFonts([headlineFont, subheadlineFont]), [headlineFont, subheadlineFont]);
   // The text scrolls up faster than the page, over the photo pinned behind it.
   const heroTextRef = useRef<HTMLDivElement>(null);
   useHeroTextParallax(heroTextRef);
@@ -89,6 +93,7 @@ export function HomePage() {
             <HeroImage
               key={heroSrc}
               src={heroSrc}
+              portraitSrc={gallery?.hero?.portraitUrl}
               onLoaded={() => setReadySrc(heroSrc)}
               onFailed={() => setFailedSrc(heroSrc)}
             />

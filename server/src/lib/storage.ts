@@ -60,8 +60,10 @@ export function buildMediaKey(category: string, ext: string): string {
 export const thumbnailKeyFor = (key: string) => `${key.replace(/\.[^./]+$/, '')}-thumb.webp`;
 // The large copy (the full-screen viewer's image) sits next to it the same way: `<id>-large.webp`.
 export const largeKeyFor = (key: string) => `${key.replace(/\.[^./]+$/, '')}-large.webp`;
+// The splash's phone copy (image-variants.ts, makePortrait): `<id>-portrait.webp`.
+export const portraitKeyFor = (key: string) => `${key.replace(/\.[^./]+$/, '')}-portrait.webp`;
 // Every file that belongs to a photo, to delete them together (some may not exist: that is harmless).
-export const allKeysFor = (key: string) => [key, thumbnailKeyFor(key), largeKeyFor(key)];
+export const allKeysFor = (key: string) => [key, thumbnailKeyFor(key), largeKeyFor(key), portraitKeyFor(key)];
 
 // Resolve a key to a file inside UPLOADS_DIR (keys are server-generated; this is defence in depth).
 function localPath(key: string): string {

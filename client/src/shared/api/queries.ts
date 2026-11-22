@@ -61,10 +61,26 @@ export const useReviews = () =>
       },
   });
 
+// index.html asks for /api/gallery before the app's JS has even loaded (for the splash photo). The first
+// query takes that answer; any later one (a refetch, another page) asks the API as usual.
+declare global {
+  interface Window {
+    __earlyGallery?: Promise<GalleryResponse | null>;
+  }
+}
+function takeEarlyGallery(): Promise<GalleryResponse | null> | undefined {
+  const early = window.__earlyGallery;
+  window.__earlyGallery = undefined;
+  return early;
+}
+
 export const useGallery = () =>
   useQuery({
     queryKey: ['gallery'],
-    queryFn: async () => (await api.get<GalleryResponse>('/gallery')).data,
+    queryFn: async () => {
+      const early = await takeEarlyGallery();
+      return early ?? (await api.get<GalleryResponse>('/gallery')).data;
+    },
   });
 
 export const useAvailability = (from: string, to: string) =>

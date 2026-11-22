@@ -5,7 +5,7 @@ import { asyncHandler } from '../../lib/async-handler.js';
 import { AppError } from '../../lib/errors.js';
 import { sniffImage } from '../../lib/image-type.js';
 import { logger } from '../../lib/logger.js';
-import { makeVariants, type ImageVariants } from '../../lib/image-variants.js';
+import { makePortrait, makeVariants, type ImageVariant, type ImageVariants } from '../../lib/image-variants.js';
 import { stripMetadata } from '../../lib/strip-metadata.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
@@ -17,6 +17,7 @@ import {
   deleteObject,
   isStorageConfigured,
   largeKeyFor,
+  portraitKeyFor,
   publicUrlFor,
   putObject,
   thumbnailKeyFor,
@@ -107,9 +108,11 @@ adminMediaRouter.post(
     // sniffImage only looked at the first few, so a truncated or corrupt file would get through.
     // The original is stored without its EXIF/XMP (GPS location, device, time): its address is public.
     let variants: ImageVariants;
+    let portrait: ImageVariant | null = null;
     let original: Buffer;
     try {
       variants = await makeVariants(body);
+      if (isHero) portrait = await makePortrait(body);
       original = await stripMetadata(body, kind.ext);
     } catch (err) {
       logger.warn({ err, bytes: body.length }, 'Rejected upload: image could not be decoded');
@@ -123,6 +126,7 @@ adminMediaRouter.post(
     const key = buildMediaKey(category, kind.ext);
     const thumbKey = thumbnailKeyFor(key);
     const largeKey = largeKeyFor(key);
+    const portraitKey = portraitKeyFor(key);
     const stored: string[] = [];
     try {
       await putObject(key, original, kind.mime);
@@ -132,6 +136,10 @@ adminMediaRouter.post(
       if (variants.large) {
         await putObject(largeKey, variants.large.data, 'image/webp');
         stored.push(largeKey);
+      }
+      if (portrait) {
+        await putObject(portraitKey, portrait.data, 'image/webp');
+        stored.push(portraitKey);
       }
 
       let replacedKeys: string[] = [];
@@ -151,6 +159,7 @@ adminMediaRouter.post(
             // is already small and light.
             url: publicUrlFor(variants.large ? largeKey : key),
             thumbnailUrl: publicUrlFor(thumbKey),
+            portraitUrl: portrait ? publicUrlFor(portraitKey) : null,
             type: 'IMAGE',
             // Alt text is required; start from the file name and let the admin refine it.
             altText: filename?.replace(/\.[^./]+$/, '').trim().slice(0, 300) || 'Photo',

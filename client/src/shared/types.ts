@@ -58,6 +58,8 @@ export interface GalleryMedia {
   type: 'IMAGE' | 'VIDEO';
   url: string;
   thumbnailUrl?: string | null;
+  // The splash only: a 9:16 crop for phones held upright (HERO_PORTRAIT_MEDIA in shared/hero.ts).
+  portraitUrl?: string | null;
   title?: string | null;
   altText: string;
   category: MediaCategory;

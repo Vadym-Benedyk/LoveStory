@@ -203,6 +203,7 @@ model Media {
   storageKey   String // S3/R2 object key
   url          String
   thumbnailUrl String?
+  portraitUrl  String? // the splash only: 9:16 crop for phones held upright (image-variants.ts)
   title        String?
   altText      String      @default("") // required for IMAGE (enforced in service)
   category     String      @default("OTHER") // HOUSE | RIVER | BBQ | TUB | NATURE | OTHER
