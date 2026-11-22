@@ -5,6 +5,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { sniffImage } from '../src/lib/image-type.js';
+import { stripMetadata } from '../src/lib/strip-metadata.js';
 import { allKeysFor, largeKeyFor, thumbnailKeyFor, UPLOADS_DIR } from '../src/lib/storage.js';
 import { MAX_UPLOAD_BYTES } from '../src/modules/media/media.routes.js';
 import { call, createUser, prisma, resetDb, startServer, type TestServer } from './helpers.js';
@@ -480,5 +481,86 @@ describe('editing the gallery', () => {
     expect(await prisma.media.count()).toBe(0);
     expect((await fetch(origin() + a.url)).status).toBe(404);
     expect((await call(srv, 'DELETE', `/admin/media/${a.id}`, { token: owner })).status).toBe(404);
+  });
+});
+
+describe('metadata on the original (its address is public)', () => {
+  // What a phone writes into a photo: the owner's name, the GPS position, an XMP block, a colour profile.
+  const EXIF = {
+    IFD0: { Artist: 'Secret Owner' },
+    IFD3: { GPSLatitudeRef: 'N', GPSLatitude: '50/1 27/1 0/1', GPSLongitudeRef: 'E', GPSLongitude: '30/1 31/1 0/1' },
+  };
+  const XMP =
+    '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">' +
+    '<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Secret Owner</dc:creator>' +
+    '</rdf:Description></rdf:RDF></x:xmpmeta>';
+  const tagged = (image: sharp.Sharp, orientation?: number) => {
+    const withAll = image.withExif(EXIF).withXmp(XMP).withIccProfile('p3');
+    return (orientation ? withAll.withMetadata({ orientation }) : withAll).toBuffer();
+  };
+  const storedOriginal = (m: { storageKey: string }) => fs.readFile(path.join(UPLOADS_DIR, m.storageKey));
+  const pixels = (buf: Buffer) => sharp(buf).raw().toBuffer();
+
+  it('a JPEG loses its EXIF, XMP and trailing data, but not a single pixel, its orientation or its colour profile', async () => {
+    const input = await tagged(blank(200, 120, 30).jpeg({ quality: 90, progressive: true }), 6);
+    const withTrailer = Buffer.concat([input, Buffer.from('appended by the phone: Secret Owner')]);
+    expect(await sharp(withTrailer).metadata()).toMatchObject({ orientation: 6, xmp: expect.anything() });
+    expect(input.includes('Secret Owner')).toBe(true); // the fixture really carries the name (EXIF + XMP)
+
+    const m = await uploadOk(withTrailer, {}, 'image/jpeg');
+    expect(m.url).toBe(`/uploads/${m.storageKey}`); // small and light: the original is what the site shows
+    const stored = await storedOriginal(m);
+    expect(stored.includes('Secret Owner')).toBe(false);
+
+    const meta = await sharp(stored).metadata();
+    expect(meta).toMatchObject({ format: 'jpeg', width: 200, height: 120, orientation: 6 });
+    expect(meta.xmp).toBeUndefined();
+    expect(meta.exif!.length).toBeLessThan(40); // only the orientation is left
+    expect(meta.icc).toBeDefined();
+    expect(await pixels(stored)).toEqual(await pixels(input)); // the image data itself was not re-encoded
+    expect((await fetch(origin() + m.url)).status).toBe(200);
+  });
+
+  it('without an orientation, a JPEG keeps no EXIF at all', async () => {
+    const m = await uploadOk(await tagged(blank(64, 48).jpeg()), {}, 'image/jpeg');
+    const meta = await sharp(await storedOriginal(m)).metadata();
+    expect(meta.exif).toBeUndefined();
+    expect(meta.xmp).toBeUndefined();
+  });
+
+  it.each([
+    ['PNG', (s: sharp.Sharp) => s.png(), 'image/png', 'png'],
+    ['WebP', (s: sharp.Sharp) => s.webp(), 'image/webp', 'webp'],
+  ])('a %s with metadata is re-encoded without it, in its own format', async (_name, encode, type, format) => {
+    const input = await tagged(encode(blank(64, 48)));
+    expect((await sharp(input).metadata()).exif).toBeDefined(); // the fixture really carries EXIF
+
+    const m = await uploadOk(input, {}, type);
+    const stored = await storedOriginal(m);
+    expect(stored.includes('Secret Owner')).toBe(false);
+    const meta = await sharp(stored).metadata();
+    expect(meta).toMatchObject({ format, width: 64, height: 48 });
+    expect(meta.exif).toBeUndefined();
+    expect(meta.xmp).toBeUndefined();
+  });
+
+  it('a WebP flagged "rotate 90°" is stored already rotated', async () => {
+    const m = await uploadOk(await tagged(blank(64, 48).webp(), 6), {}, 'image/webp');
+    expect(await sharp(await storedOriginal(m)).metadata()).toMatchObject({ width: 48, height: 64 });
+  });
+
+  it('changes nothing when there is nothing to remove, so it can run again on its own output', async () => {
+    for (const [buf, ext] of [
+      [JPEG, 'jpg'],
+      [PNG, 'png'],
+      [WEBP, 'webp'],
+      [AVIF, 'avif'],
+    ] as const) {
+      expect(await stripMetadata(buf, ext)).toBe(buf);
+    }
+    const once = await stripMetadata(await tagged(blank(64, 48).jpeg(), 6), 'jpg');
+    expect(await stripMetadata(once, 'jpg')).toBe(once);
+    const webp = await stripMetadata(await tagged(blank(64, 48).webp()), 'webp');
+    expect(await stripMetadata(webp, 'webp')).toBe(webp);
   });
 });

@@ -14,6 +14,7 @@
 #                lovestory-tools npm run prisma:push        # create / update the schema
 #              ... lovestory-tools npm run prisma:seed       # first run: owner account + default content
 #              ... lovestory-tools npm run media:thumbnails  # photos uploaded before the lighter copies
+#              ... lovestory-tools npm run media:strip-metadata  # remove EXIF/GPS from older originals
 #            `prisma db push` refuses changes that would lose data; do not add --accept-data-loss.
 #   runtime  production dependencies + compiled code only (no dev tools, hence no prisma CLI or tsx)
 FROM node:26-bookworm-slim AS build

@@ -49,8 +49,11 @@ Uploads already pass through the API (byte validation), so processing happens th
 Lambda. State of the working tree on 2026-11-08 (uncommitted): `server/src/lib/image-variants.ts` makes
 two WebP copies per upload: an 800 px thumbnail (grids) and, for big originals, a 2400 px "large" copy
 (full-screen viewer and splash; it becomes the photo's `url`). Both are EXIF-rotated and carry no
-metadata. The original is kept (`Media.storageKey`) but no public page links to it; it still has its
-EXIF, including GPS. `npm run media:thumbnails` backfills older photos.
+metadata. The original is kept (`Media.storageKey`). Its address is public (the gallery API returns the key,
+and a small photo's original is its `url`), so since 2026-11-22 uploads store it without EXIF/XMP/IPTC
+(`server/src/lib/strip-metadata.ts`: JPEG losslessly, keeping only the orientation and the colour profile;
+other formats re-encoded). `npm run media:thumbnails` backfills older copies, `npm run media:strip-metadata`
+cleans older originals.
 
 Not done yet / still to decide:
 

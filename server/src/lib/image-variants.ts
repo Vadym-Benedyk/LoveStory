@@ -4,7 +4,8 @@ import sharp from 'sharp';
 // multi-megabyte original:
 //   thumbnail  800 px  the grids (home page, "All photos", the viewer's thumbnail strip, the admin)
 //   large      2400 px the full-screen viewer and the home-page splash (it becomes the photo's `url`)
-// The original is kept as uploaded (Media.storageKey), e.g. to remake the copies later.
+// The original is kept (Media.storageKey), e.g. to remake the copies later; only its metadata is removed
+// (strip-metadata.ts).
 
 export const THUMBNAIL_MAX_SIZE = 800; // longest side, px: crisp at 2× density in a 3-column grid
 export const LARGE_MAX_SIZE = 2400; // longest side, px: sharp full-screen on a laptop, zoomable

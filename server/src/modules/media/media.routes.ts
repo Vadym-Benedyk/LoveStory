@@ -6,6 +6,7 @@ import { AppError } from '../../lib/errors.js';
 import { sniffImage } from '../../lib/image-type.js';
 import { logger } from '../../lib/logger.js';
 import { makeVariants, type ImageVariants } from '../../lib/image-variants.js';
+import { stripMetadata } from '../../lib/strip-metadata.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth, requireRole } from '../../middleware/auth.js';
 import { prisma } from '../../lib/prisma.js';
@@ -104,9 +105,12 @@ adminMediaRouter.post(
 
     // The lighter copies (made once, now) are also what proves the bytes really are a decodable image:
     // sniffImage only looked at the first few, so a truncated or corrupt file would get through.
+    // The original is stored without its EXIF/XMP (GPS location, device, time): its address is public.
     let variants: ImageVariants;
+    let original: Buffer;
     try {
       variants = await makeVariants(body);
+      original = await stripMetadata(body, kind.ext);
     } catch (err) {
       logger.warn({ err, bytes: body.length }, 'Rejected upload: image could not be decoded');
       throw new AppError(
@@ -121,7 +125,7 @@ adminMediaRouter.post(
     const largeKey = largeKeyFor(key);
     const stored: string[] = [];
     try {
-      await putObject(key, body, kind.mime);
+      await putObject(key, original, kind.mime);
       stored.push(key);
       await putObject(thumbKey, variants.thumbnail.data, 'image/webp');
       stored.push(thumbKey);
@@ -142,7 +146,7 @@ adminMediaRouter.post(
         const last = await tx.media.findFirst({ orderBy: { sortOrder: 'desc' } });
         return tx.media.create({
           data: {
-            storageKey: key, // the original, as uploaded
+            storageKey: key, // the original, as uploaded minus its metadata (strip-metadata.ts)
             // What the site shows full-size (viewer, splash): the 2400 px copy, or the original itself when it
             // is already small and light.
             url: publicUrlFor(variants.large ? largeKey : key),

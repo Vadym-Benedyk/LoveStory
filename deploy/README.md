@@ -102,6 +102,7 @@ Try a restore on a spare machine once, before you need it.
 
 - Status and logs: `docker compose ps`, `docker compose logs -f api` (rotated, 3 x 10 MB).
 - Photos uploaded before the lighter copies existed: `docker compose run --rm tools npm run media:thumbnails`.
+- Originals uploaded before uploads dropped their EXIF/GPS: `docker compose run --rm tools npm run media:strip-metadata` (once is enough; safe to repeat).
 - Reset the owner password: `docker compose run --rm tools npm run admin:reset -- <email> '<newPassword>'`.
 - Free disk after releases: `docker image prune`.
 - Never run `docker compose down -v` here: it deletes the `caddy_data` volume with the certificates.

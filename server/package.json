@@ -16,6 +16,7 @@
     "prisma:studio": "prisma studio",
     "admin:reset": "tsx scripts/reset-admin-password.ts",
     "media:thumbnails": "tsx scripts/generate-thumbnails.ts",
+    "media:strip-metadata": "tsx scripts/strip-metadata.ts",
     "test": "vitest run"
   },
   "prisma": {
