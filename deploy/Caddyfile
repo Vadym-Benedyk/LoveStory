@@ -1,9 +1,57 @@
-# API only: the site and the photos are served by CloudFront. Caddy gets and renews the Let's Encrypt
-# certificate by itself; api.<DOMAIN> must already point at this server and ports 80/443 must be open.
+# The whole site runs here while the account may not use CloudFront: the client (built into the Caddy image,
+# client/Dockerfile), the API and the photos (STORAGE_DRIVER=local, served by the API at /uploads).
+# Caddy gets and renews the Let's Encrypt certificates by itself; <DOMAIN>, www.<DOMAIN> and api.<DOMAIN>
+# must already point at this server and ports 80/443 must be open.
 {
 	email {$ACME_EMAIL}
 }
 
+# For the client's files only: the API sets its own (helmet), and two copies of a header confuse browsers.
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options SAMEORIGIN
+	}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+	handle /uploads/* {
+		reverse_proxy api:4000
+	}
+
+	# The client. Vite puts a content hash in every file name under assets/: cached forever, and a missing
+	# one is a plain 404 (not index.html, which would then be cached as that file).
+	handle /assets/* {
+		import security_headers
+		root * /srv/site
+		@found file
+		header @found Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+	# Everything else (index.html above all) is checked on every visit, so a release shows up at once. A
+	# single-page app: any path that is not a file gets index.html.
+	handle {
+		import security_headers
+		root * /srv/site
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+
+# Kept for the health check (deploy/release.sh) and for later, when the site moves to CloudFront again and
+# calls the API here.
 api.{$DOMAIN} {
 	encode zstd gzip
 	reverse_proxy api:4000

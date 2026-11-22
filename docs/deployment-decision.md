@@ -43,6 +43,30 @@ Wiring:
   `linux/arm64`. The API is down for a few seconds during a redeploy (single SQLite writer); the
   static site stays up.
 
+## Interim: the whole site on the instance (decided 2026-11-22)
+
+AWS Support refused the CloudFront verification of the new account for now (it wants a history of usage
+and paid bills; ask again after a billing cycle or two). S3 alone cannot serve the site: its website
+endpoint has no HTTPS on a custom domain, and an ACM certificate only attaches to CloudFront or a load
+balancer. So until then the Lightsail instance serves everything, with the Caddy that already gets
+Let's Encrypt certificates for `api.`:
+
+- The client is built into the Caddy image (`client/Dockerfile`) on every release; `<domain>` serves it
+  (`assets/*` cached a year, everything else `no-cache`, SPA fallback to `index.html`), `www.` redirects
+  to it. The hashed files of earlier releases stay two weeks in the `site` volume, so open pages can still
+  load their lazy chunks.
+- `/api` and `/uploads` on `<domain>` go to the API: same origin, so no CORS, and the client's default
+  `VITE_API_BASE=/api` works as is. `api.<domain>` stays (release health check, the later CloudFront setup,
+  photo links from before).
+- Photos: `STORAGE_DRIVER=local` in `DATA_DIR/uploads`, set in `docker-compose.yml`. `backup.sh` syncs them
+  to `uploads/` in the backup bucket, which never expires (only `lovestory/` dumps do).
+- DNS: `server.yml` (`SiteOnServer=true`) points `<domain>` and `www.` at the static IP.
+
+Costs nothing extra. Lost compared with the decision above: no CDN (slower far from Frankfurt), one
+machine for everything (if it is down, so is the site), photos on its 40 GB disk. Back to the plan: ask
+AWS again, `SiteOnServer=false`, deploy `app.yml`, copy `DATA_DIR/uploads` into the photo bucket as it is,
+switch `STORAGE_DRIVER=s3` and rewrite the stored photo URLs.
+
 ## Photo processing: on the API with `sharp`, not Lambda
 
 Uploads already pass through the API (byte validation), so processing happens there; no S3 events or

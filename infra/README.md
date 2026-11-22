@@ -5,7 +5,7 @@ Four templates describe the AWS side of [`docs/deployment-decision.md`](../docs/
 | Template | Region | Creates |
 |---|---|---|
 | `certificate.yml` | us-east-1 | The ACM certificate for `<domain>`, `www.<domain>` and `cdn.<domain>` (CloudFront only reads certificates from us-east-1) |
-| `server.yml` | eu-central-1 | The Lightsail instance (daily snapshots, firewall, Docker installed on first boot), its static IP, the `api.<domain>` record, the private bucket for database backups and its IAM user |
+| `server.yml` | eu-central-1 | The Lightsail instance (daily snapshots, firewall, Docker installed on first boot), its static IP, the `api.<domain>` record (and, with `SiteOnServer=true`, the default, the `<domain>` and `www.<domain>` records), the private bucket for backups (database dumps, photos) and its IAM user |
 | `mail.yml` | eu-central-1 | Amazon SES: the verified domain (DKIM, custom MAIL FROM, DMARC), its DNS records and the IAM user whose key is the SMTP login |
 | `app.yml` | eu-central-1 | Two private S3 buckets (site, photos), two CloudFront distributions in front of them, the site/`www`/`cdn` records and the IAM user for photos |
 
@@ -21,6 +21,10 @@ server, account still in the sandbox). As of 2026-11-11 all templates pass `cfn-
 (stack `lovestory-cert`, certificate issued). `server.yml` is deployed (stack `lovestory-server`, bundle
 `micro_3_0`, 1 GB). `app.yml` is **not** deployed: the new AWS account must be verified by AWS Support
 before it may create CloudFront distributions.
+
+2026-11-22: AWS Support refused the CloudFront verification for now (it wants a history of usage and
+paid bills; ask again after the next billing cycle or two). Until then the instance serves the whole site
+(`SiteOnServer=true` in `server.yml`, [`deploy/`](../deploy/README.md)), and `app.yml` waits.
 
 Limits a new AWS account ran into here: the 2 GB Lightsail bundle `small_3_0` was refused (Support: ask
 again after 2-3 billing cycles), and CloudFront needs an account verification through a Support case.
@@ -76,7 +80,13 @@ aws cloudformation deploy --region eu-central-1 --stack-name lovestory-server \
 aws cloudformation describe-stacks --region eu-central-1 --stack-name lovestory-server --query "Stacks[0].Outputs" --output table
 ```
 
-Add `BundleId=micro_3_0` (1 GB, $7) if the account is refused the default 2 GB bundle. Then the site:
+Add `BundleId=micro_3_0` (1 GB, $7) if the account is refused the default 2 GB bundle. With the default
+`SiteOnServer=true` the instance also serves the site and the photos, and the stack points `<domain>` and
+`www.<domain>` at it: that is the whole setup while the account may not use CloudFront (skip the rest of
+this step, step 6, and the photo key of step 4).
+
+Then, once CloudFront is allowed, the site. First update the server stack with `SiteOnServer=false` (its
+`<domain>`/`www` records go, and the site is down until the CloudFront ones exist), then:
 
 ```bash
 aws cloudformation deploy --region eu-central-1 --stack-name lovestory \
@@ -100,6 +110,9 @@ of the site stack and `StaticIpAddress` of the server stack say what to create:
 - `cdn.<domain>`: CNAME to the photo distribution.
 - `api.<domain>`: A record to the static IP.
 
+While the site is on the server (`SiteOnServer=true`, no site stack), `<domain>` and `www.<domain>` are
+A records to the static IP as well.
+
 ## 4. Access keys
 
 Create them by hand, they are shown once:
@@ -111,7 +124,8 @@ aws iam create-access-key --user-name <BackupUserName output of the server stack
 
 The first goes into `deploy/.env` (`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, plus `S3_BUCKET` =
 `MediaBucketName` and `S3_PUBLIC_URL=https://cdn.<domain>`). The second goes into `aws configure` on the
-server, for `deploy/backup.sh` with `BACKUP_S3_URI=s3://<BackupBucketName>/lovestory`.
+server, for `deploy/backup.sh` with `BACKUP_S3_URI=s3://<BackupBucketName>/lovestory` and, while the
+photos are on the server, `UPLOADS_S3_URI=s3://<BackupBucketName>/uploads`.
 
 ## 5. The server
 

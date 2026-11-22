@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  LoveStory - the Lightsail instance that runs the API, its static IP, the api DNS record and the bucket
-  for database backups (see docs/deployment-decision.md)
+  LoveStory - the Lightsail instance that runs the API (and, while SiteOnServer is true, the site), its
+  static IP, its DNS records and the bucket for backups (see docs/deployment-decision.md)
 
 # Deploy in eu-central-1. It does not depend on certificate.yml or app.yml (Caddy on the instance gets its
 # own Let's Encrypt certificate), so the API can go up before the site. See infra/README.md.
@@ -17,8 +17,9 @@ Parameters:
     Type: String
     Default: ""
     Description: >-
-      Route 53 hosted zone of the domain. When set, the api.<domain> record is created in it. Empty means
-      the DNS is elsewhere and you create the record by hand (see the StaticIpAddress output).
+      Route 53 hosted zone of the domain. When set, the api.<domain> record (and with SiteOnServer the
+      <domain> and www.<domain> records) is created in it. Empty means the DNS is elsewhere and you create
+      the records by hand (see the StaticIpAddress output).
   InstanceName:
     Type: String
     Default: lovestory-api
@@ -49,19 +50,31 @@ Parameters:
     Default: 0.0.0.0/0
     Description: Who may reach SSH (port 22), in CIDR notation. Use your own address (x.x.x.x/32) if you can.
     AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$
+  SiteOnServer:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      true while the instance also serves the site and the photos (no CloudFront): <domain> and
+      www.<domain> then point at it. Set to false BEFORE deploying app.yml, which creates those records
+      for CloudFront.
   BackupRetentionDays:
     Type: Number
     Default: 30
     MinValue: 1
-    Description: Database backups in the backup bucket are deleted after this many days
+    Description: >-
+      Database dumps (under lovestory/ in the backup bucket) are deleted after this many days. The photo
+      backup (under uploads/) never expires.
 
 Conditions:
   HasKeyPair: !Not [!Equals [!Ref KeyPairName, ""]]
   HasHostedZone: !Not [!Equals [!Ref HostedZoneId, ""]]
+  HasSiteRecords: !And [!Condition HasHostedZone, !Equals [!Ref SiteOnServer, "true"]]
 
 Resources:
   # ---------------------------------------------------------------- database backups
-  # Database dumps hold guests' names and phone numbers: private, and old ones expire.
+  # Database dumps hold guests' names and phone numbers: private, and old ones expire. Two prefixes, both
+  # written by deploy/backup.sh: lovestory/ (dumps, BACKUP_S3_URI) and uploads/ (photos, UPLOADS_S3_URI).
   BackupBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
@@ -83,6 +96,8 @@ Resources:
         Rules:
           - Id: expire-old-backups
             Status: Enabled
+            # Only the dumps: a photo is uploaded once and must stay as long as the site has it.
+            Prefix: lovestory/
             ExpirationInDays: !Ref BackupRetentionDays
           - Id: abort-incomplete-uploads
             Status: Enabled
@@ -121,6 +136,15 @@ Resources:
                   - s3:PutObject
                   - s3:AbortMultipartUpload
                 Resource: !Sub ${BackupBucket.Arn}/*
+              # `aws s3 sync` of the photos lists what is already there, so only new files are uploaded.
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt BackupBucket.Arn
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - uploads/
+                      - uploads/*
 
   # ---------------------------------------------------------------- Lightsail
   Instance:
@@ -213,14 +237,40 @@ Resources:
       ResourceRecords:
         - !GetAtt StaticIp.IpAddress
 
+  SiteDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasSiteRecords
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      TTL: "300"
+      ResourceRecords:
+        - !GetAtt StaticIp.IpAddress
+
+  WwwDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasSiteRecords
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub www.${DomainName}
+      Type: A
+      TTL: "300"
+      ResourceRecords:
+        - !GetAtt StaticIp.IpAddress
+
 Outputs:
   InstanceName:
     Value: !Ref InstanceName
   StaticIpAddress:
-    Description: A record for api.<domain> (already created by this stack when HostedZoneId is set)
+    Description: >-
+      A records for api.<domain>, and with SiteOnServer for <domain> and www.<domain> (already created by
+      this stack when HostedZoneId is set)
     Value: !GetAtt StaticIp.IpAddress
   BackupBucketName:
-    Description: BACKUP_S3_URI=s3://<this bucket>/lovestory for deploy/backup.sh
+    Description: >-
+      For deploy/backup.sh: BACKUP_S3_URI=s3://<this bucket>/lovestory and UPLOADS_S3_URI=s3://<this
+      bucket>/uploads
     Value: !Ref BackupBucket
   BackupUserName:
     Description: Create its access key for the AWS CLI that backup.sh uses on the server

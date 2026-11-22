@@ -1,8 +1,9 @@
-# Every push to main: checks (types, lint, tests, client build), then the release of the API on the
-# Lightsail server (deploy/release.sh, over SSH with a key that can only run that script).
+# Every push to main: checks (types, lint, tests, client build), then the release of the site and the API
+# on the Lightsail server (deploy/release.sh, over SSH with a key that can only run that script). The
+# client is built there, into the Caddy image (client/Dockerfile).
 #
-# The site itself (S3 + CloudFront, infra/deploy-client.sh) is not published here yet: the CloudFront
-# stack does not exist. Add a job for it once it does.
+# Not used while the account may not create CloudFront distributions: S3 + CloudFront for the site
+# (infra/app.yml, infra/deploy-client.sh).
 #
 # Secrets, in the `production` environment of the repository (Settings > Environments):
 #   DEPLOY_HOST         address of the server (the static IP)
@@ -43,13 +44,13 @@ jobs:
       - run: npm test
       - run: npm run build:client
 
-  deploy-api:
+  deploy:
     needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
       name: production
-      url: https://api.lovestory.vin/api/health
+      url: https://lovestory.vin
     steps:
       - name: Release on the server
         env:
