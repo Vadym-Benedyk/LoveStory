@@ -8,9 +8,16 @@
 # command arrives in SSH_ORIGINAL_COMMAND and is only accepted as a 40-character commit id or `check`.
 # By hand on the server: deploy/release.sh [<sha>|check]
 #
-# Steps: backup of the database, checkout of the commit, image builds (API, tools, Caddy with the client),
-# schema push, container swap, health check of the API and the site. Any failure stops the release and the running containers stay as they were (`build` only makes new
-# images; `up` replaces the API only after the schema push went through). A schema change that would lose
+# Steps: backup of the database, checkout of the commit, the images (API, tools, Caddy with the client),
+# schema push, container swap, health check of the API and the site. Any failure stops the release and the
+# running containers stay as they were (pull/build only make new images; `up` replaces the containers only
+# after the schema push went through).
+#
+# Images: with IMAGE_REGISTRY in deploy/.env (e.g. ghcr.io/<owner>/lovestory) they are pulled as
+# <IMAGE_REGISTRY>-{api,tools,web}:<commit>, built and pushed by GitHub Actions, and tagged
+# lovestory-{api,tools,web}:local, the names docker-compose.yml uses, so every `docker compose` command
+# by hand keeps working on the released images. Without it they are built here (slow on 1 GB: ~5 minutes
+# of a sluggish site). A schema change that would lose
 # data stops at `prisma db push`: decide by hand (deploy/README.md, Release).
 #
 # The whole body is inside main(), so bash has read all of it before `git checkout` replaces this file.
@@ -54,10 +61,22 @@ main() {
   git checkout --quiet --force --detach "$sha"
 
   cd "$repo/deploy"
-  # One image at a time: in parallel they do not fit in the 1 GB of RAM (api and tools share their build stage).
-  docker compose build --quiet api
-  docker compose --profile tools build --quiet tools
-  docker compose build --quiet caddy
+  local registry
+  registry=$(grep -E '^IMAGE_REGISTRY=' .env | head -1 | cut -d= -f2- || true)
+  if [ -n "$registry" ]; then
+    local name
+    for name in api tools web; do
+      docker pull --quiet "$registry-$name:$sha" >/dev/null
+      docker tag "$registry-$name:$sha" "lovestory-$name:local"
+      docker rmi "$registry-$name:$sha" >/dev/null # the :local tag keeps the image
+    done
+    echo "release: pulled the images of ${sha:0:7} from $registry"
+  else
+    # One image at a time: in parallel they do not fit in the 1 GB of RAM (api and tools share their build stage).
+    docker compose build --quiet api
+    docker compose --profile tools build --quiet tools
+    docker compose build --quiet caddy
+  fi
   docker compose run --rm -T tools npm run --silent prisma:push
   docker compose up -d --wait --remove-orphans
 
