@@ -54,7 +54,10 @@ main() {
   git checkout --quiet --force --detach "$sha"
 
   cd "$repo/deploy"
-  docker compose --profile tools build --quiet
+  # One image at a time: in parallel they do not fit in the 1 GB of RAM (api and tools share their build stage).
+  docker compose build --quiet api
+  docker compose --profile tools build --quiet tools
+  docker compose build --quiet caddy
   docker compose run --rm -T tools npm run --silent prisma:push
   docker compose up -d --wait --remove-orphans
 

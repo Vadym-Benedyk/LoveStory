@@ -12,6 +12,9 @@ COPY package*.json ./
 COPY client/package.json ./client/
 RUN npm ci --workspace client --include-workspace-root
 COPY client ./client
+# On the 1 GB server Node's default heap limit is too small for the type check + Vite build (it aborts with
+# exit code 134). The server has 2 GB of swap (infra/server.yml), so let the heap grow past the RAM.
+ENV NODE_OPTIONS=--max-old-space-size=1536
 RUN npm --workspace client run build
 
 FROM caddy:2

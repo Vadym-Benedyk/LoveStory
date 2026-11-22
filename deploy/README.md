@@ -27,7 +27,7 @@ S3 + CloudFront setup (`infra/app.yml`) waits until AWS lets the account create 
 ## First run
 
 ```bash
-docker compose build
+docker compose build api && docker compose --profile tools build tools && docker compose build caddy   # one at a time: 1 GB of RAM
 docker compose run --rm tools npm run prisma:push   # create the schema
 docker compose run --rm tools npm run prisma:seed   # owner account + default content, once
 docker compose up -d
@@ -61,7 +61,7 @@ To replace the key: generate a new pair, swap that line, `gh secret set DEPLOY_S
 
 ```bash
 cd /opt/lovestory && git pull && cd deploy
-docker compose build
+docker compose build api && docker compose --profile tools build tools && docker compose build caddy   # one at a time: 1 GB of RAM
 docker compose run --rm tools npm run prisma:push
 docker compose up -d
 ```
