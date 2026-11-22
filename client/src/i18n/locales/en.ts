@@ -166,6 +166,8 @@ export const en: Record<string, string> = {
   'admin.login.signIn': 'Sign in',
   'admin.login.signingIn': 'Signing in…',
   'admin.login.error': 'Invalid email or password.',
+  'admin.password.show': 'Show password',
+  'admin.password.hide': 'Hide password',
 
   'admin.common.loading': 'Loading…',
 

@@ -171,6 +171,8 @@ export const uk: Record<string, string> = {
   'admin.login.signIn': 'Увійти',
   'admin.login.signingIn': 'Входимо…',
   'admin.login.error': 'Невірна пошта або пароль.',
+  'admin.password.show': 'Показати пароль',
+  'admin.password.hide': 'Сховати пароль',
 
   'admin.common.loading': 'Завантаження…',
 
