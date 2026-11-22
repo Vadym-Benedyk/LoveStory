@@ -17,7 +17,14 @@
 #              ... lovestory-tools npm run media:strip-metadata  # remove EXIF/GPS from older originals
 #            `prisma db push` refuses changes that would lose data; do not add --accept-data-loss.
 #   runtime  production dependencies + compiled code only (no dev tools, hence no prisma CLI or tsx)
-FROM node:26-bookworm-slim AS build
+
+# Prisma reads the OpenSSL version to pick its engine and warns on every command when the slim image has none.
+FROM node:26-bookworm-slim AS base
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
+
+FROM base AS build
 WORKDIR /app
 COPY package*.json ./
 COPY server/package.json ./server/
@@ -31,7 +38,7 @@ RUN DATABASE_URL=file:/tmp/generate-placeholder.db npm --workspace server run pr
 FROM build AS tools
 WORKDIR /app/server
 
-FROM node:26-bookworm-slim AS runtime
+FROM base AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./
