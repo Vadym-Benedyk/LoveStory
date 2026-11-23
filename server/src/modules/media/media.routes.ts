@@ -205,7 +205,10 @@ adminMediaRouter.post(
   '/reorder',
   validate({
     body: z.object({
-      items: z.array(z.object({ id: z.string(), sortOrder: z.number().int() })).min(1),
+      items: z
+        .array(z.object({ id: z.string().max(64), sortOrder: z.number().int().min(0).max(100_000) }))
+        .min(1)
+        .max(1000),
     }),
   }),
   asyncHandler(async (req, res) => {

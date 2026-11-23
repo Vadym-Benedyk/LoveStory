@@ -5,6 +5,7 @@ import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { loginLimiter, passwordChangeLimiter } from '../../middleware/rate-limit.js';
 import { isProd } from '../../config/env.js';
+import { MIN_ADMIN_PASSWORD_LENGTH } from '../../lib/password-policy.js';
 import * as service from './auth.service.js';
 
 export const authRouter = Router();
@@ -38,10 +39,15 @@ authRouter.post(
   }),
 );
 
-authRouter.post('/logout', (req, res) => {
-  res.clearCookie(REFRESH_COOKIE, { ...cookieOpts, maxAge: undefined });
-  res.json({ ok: true });
-});
+// Ends this browser's session on the server too, so a copy of the cookie stops working.
+authRouter.post(
+  '/logout',
+  asyncHandler(async (req, res) => {
+    await service.logout(req.cookies?.[REFRESH_COOKIE]);
+    res.clearCookie(REFRESH_COOKIE, { ...cookieOpts, maxAge: undefined });
+    res.json({ ok: true });
+  }),
+);
 
 authRouter.get(
   '/me',
@@ -58,11 +64,19 @@ authRouter.post(
   validate({
     body: z.object({
       currentPassword: z.string().min(1),
-      newPassword: z.string().min(10, 'At least 10 characters').max(200),
+      newPassword: z
+        .string()
+        .min(MIN_ADMIN_PASSWORD_LENGTH, `At least ${MIN_ADMIN_PASSWORD_LENGTH} characters`)
+        .max(200),
     }),
   }),
   asyncHandler(async (req, res) => {
-    await service.changePassword(req.user!.id, req.body.currentPassword, req.body.newPassword);
-    res.json({ ok: true });
+    const { endedSessions } = await service.changePassword(
+      req.user!.id,
+      req.user!.sid,
+      req.body.currentPassword,
+      req.body.newPassword,
+    );
+    res.json({ ok: true, endedSessions });
   }),
 );

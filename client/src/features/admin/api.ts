@@ -241,7 +241,8 @@ const isHeicFile = (f: File) => /^image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i
 // hands back a PNG then). The converter is a ~3 MB wasm bundle, loaded only when needed.
 async function convertHeic(file: File): Promise<File> {
   try {
-    const { heicTo } = await import('heic-to');
+    // The CSP build: the default one compiles code from strings, which the site's CSP forbids.
+    const { heicTo } = await import('heic-to/csp');
     let blob = await heicTo({ blob: file, type: 'image/webp', quality: 0.85 });
     if (blob.type !== 'image/webp') blob = await heicTo({ blob: file, type: 'image/jpeg', quality: 0.9 });
     const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';

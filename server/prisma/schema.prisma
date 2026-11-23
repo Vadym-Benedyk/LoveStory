@@ -36,6 +36,23 @@ model User {
   confirmedBookings Booking[]       @relation("ConfirmedBy")
   calendarBlocks    CalendarBlock[]
   auditLogs         AuditLog[]
+  sessions          AdminSession[]
+}
+
+// One signed-in browser of an admin. Its id is in both tokens: every admin request checks that the
+// session is still live, so logging out, changing the password or deactivating the user ends access
+// at once instead of when a token expires. Expired rows are deleted by the hourly job.
+model AdminSession {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // ---------------------------------------------------------------------------

@@ -38,6 +38,7 @@ export async function resetDb() {
     prisma.priceRule.deleteMany(),
     prisma.contentBlock.deleteMany(),
     prisma.siteSettings.deleteMany(),
+    prisma.adminSession.deleteMany(),
     prisma.user.deleteMany(),
   ]);
   // Minimal data the booking flow needs: a base nightly rate and the settings singleton.
@@ -51,10 +52,14 @@ export async function createUser(role: Role, email = `${role.toLowerCase()}@test
   const user = await prisma.user.create({
     data: { email, name: role, role, passwordHash: 'x' },
   });
-  const token = jwt.sign({ id: user.id, role, email }, process.env.JWT_ACCESS_SECRET!, {
+  // Every access token belongs to a live session (middleware/auth.ts checks it).
+  const session = await prisma.adminSession.create({
+    data: { userId: user.id, expiresAt: new Date(Date.now() + 3_600_000) },
+  });
+  const token = jwt.sign({ id: user.id, role, email, sid: session.id }, process.env.JWT_ACCESS_SECRET!, {
     expiresIn: '1h',
   });
-  return { user, token };
+  return { user, token, sid: session.id };
 }
 
 // YYYY-MM-DD, `n` days from today (UTC) — keeps stays in the future whenever tests run.
