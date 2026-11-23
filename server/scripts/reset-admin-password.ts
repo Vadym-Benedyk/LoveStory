@@ -7,11 +7,12 @@
  *   npm run admin:reset
  *
  * Examples:
- *   npm run admin:reset -- owner@example.com "MyNewPass123!"
+ *   npm run admin:reset -- owner@example.com "<a long password of your own>"
  */
 import bcrypt from 'bcryptjs';
 import 'dotenv/config';
 import { prisma } from '../src/lib/prisma.js';
+import { adminPasswordProblem } from '../src/lib/password-policy.js';
 
 async function main() {
   const [, , argEmail, argPassword] = process.argv;
@@ -24,6 +25,12 @@ async function main() {
       'No password provided. Pass one as an argument or set OWNER_PASSWORD in server/.env.\n' +
         'Usage: npm run admin:reset -- <email> <newPassword>',
     );
+    process.exit(1);
+  }
+  const problem = adminPasswordProblem(password);
+  if (problem) {
+    // eslint-disable-next-line no-console
+    console.error(`This password cannot be used: ${problem}.`);
     process.exit(1);
   }
 

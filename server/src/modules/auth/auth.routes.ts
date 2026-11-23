@@ -5,6 +5,7 @@ import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { loginLimiter, passwordChangeLimiter } from '../../middleware/rate-limit.js';
 import { isProd } from '../../config/env.js';
+import { MIN_ADMIN_PASSWORD_LENGTH } from '../../lib/password-policy.js';
 import * as service from './auth.service.js';
 
 export const authRouter = Router();
@@ -58,7 +59,10 @@ authRouter.post(
   validate({
     body: z.object({
       currentPassword: z.string().min(1),
-      newPassword: z.string().min(10, 'At least 10 characters').max(200),
+      newPassword: z
+        .string()
+        .min(MIN_ADMIN_PASSWORD_LENGTH, `At least ${MIN_ADMIN_PASSWORD_LENGTH} characters`)
+        .max(200),
     }),
   }),
   asyncHandler(async (req, res) => {

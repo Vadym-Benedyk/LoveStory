@@ -1,9 +1,12 @@
 import bcrypt from 'bcryptjs';
 import 'dotenv/config';
 import { prisma } from '../src/lib/prisma.js';
+import { adminPasswordProblem } from '../src/lib/password-policy.js';
 
 const OWNER_EMAIL = process.env.OWNER_EMAIL ?? 'owner@example.com';
-const OWNER_PASSWORD = process.env.OWNER_PASSWORD ?? 'ChangeMe123!';
+// The example password is only a convenience for a local database (NODE_ENV=development in server/.env).
+const IS_DEV = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+const OWNER_PASSWORD = process.env.OWNER_PASSWORD ?? (IS_DEV ? 'ChangeMe123!' : undefined);
 const CURRENCY = process.env.DEFAULT_CURRENCY ?? 'UAH';
 
 const defaultContent: Record<string, string> = {
@@ -58,13 +61,24 @@ const includedItems: { name: string; nameEn: string; icon: string }[] = [
 ];
 
 async function main() {
-  // Owner
-  const passwordHash = await bcrypt.hash(OWNER_PASSWORD, 10);
-  await prisma.user.upsert({
-    where: { email: OWNER_EMAIL },
-    update: {},
-    create: { email: OWNER_EMAIL, passwordHash, name: 'Owner', role: 'OWNER' },
-  });
+  // Owner: created once; an existing account (and its password) is left alone.
+  const existingOwner = await prisma.user.findUnique({ where: { email: OWNER_EMAIL }, select: { id: true } });
+  if (!existingOwner) {
+    const problem = OWNER_PASSWORD === undefined ? 'OWNER_PASSWORD is not set' : adminPasswordProblem(OWNER_PASSWORD);
+    if (problem && !IS_DEV) {
+      throw new Error(`Refusing to create the owner account with this password: ${problem}. Set OWNER_PASSWORD.`);
+    }
+    // eslint-disable-next-line no-console
+    if (problem) console.warn(`Owner password is weak (${problem}); fine for a local database only.`);
+    await prisma.user.create({
+      data: {
+        email: OWNER_EMAIL,
+        passwordHash: await bcrypt.hash(OWNER_PASSWORD!, 10),
+        name: 'Owner',
+        role: 'OWNER',
+      },
+    });
+  }
 
   // Settings singleton
   await prisma.siteSettings.upsert({

@@ -12,12 +12,12 @@ const schema = z.object({
 
   DATABASE_URL: z.string(),
 
+  // Production: at least 32 characters each (openssl rand -hex 32), different, and not an example
+  // value from the repository; see the check below the schema.
   JWT_ACCESS_SECRET: z.string().min(8),
   JWT_REFRESH_SECRET: z.string().min(8),
   JWT_ACCESS_TTL: z.string().default('15m'),
   JWT_REFRESH_TTL: z.string().default('7d'),
-  OWNER_EMAIL: z.string().email().default('owner@example.com'),
-  OWNER_PASSWORD: z.string().min(6).default('ChangeMe123!'),
 
   PENDING_EXPIRY_DAYS: z.coerce.number().default(7),
   // All prices are in hryvnias (minor units = kopiyky). Kept configurable, but the site shows UAH.
@@ -47,7 +47,34 @@ const schema = z.object({
   TELEGRAM_CHAT_ID: z.string().optional(),
 });
 
-const parsed = schema.safeParse(process.env);
+// Whoever knows a token secret can sign themselves an owner's token, so production refuses the weak
+// and the published ones (.env.example, the tests) instead of starting with them.
+const MIN_PROD_SECRET_LENGTH = 32;
+const PUBLIC_EXAMPLE_SECRET = /change-?me|test-(access|refresh)-secret|^(secret|password)$/i;
+
+const checkedSchema = schema.superRefine((e, ctx) => {
+  if (e.NODE_ENV !== 'production') return;
+  for (const key of ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const) {
+    if (e[key].length < MIN_PROD_SECRET_LENGTH) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [key],
+        message: `must be at least ${MIN_PROD_SECRET_LENGTH} characters in production (openssl rand -hex 32)`,
+      });
+    } else if (PUBLIC_EXAMPLE_SECRET.test(e[key])) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: 'is an example value; generate a real one' });
+    }
+  }
+  if (e.JWT_ACCESS_SECRET === e.JWT_REFRESH_SECRET) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['JWT_REFRESH_SECRET'],
+      message: 'must differ from JWT_ACCESS_SECRET',
+    });
+  }
+});
+
+const parsed = checkedSchema.safeParse(process.env);
 if (!parsed.success) {
   // eslint-disable-next-line no-console
   console.error('Invalid environment variables:', parsed.error.flatten().fieldErrors);
