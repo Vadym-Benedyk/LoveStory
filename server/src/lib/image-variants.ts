@@ -4,6 +4,7 @@ import sharp from 'sharp';
 // multi-megabyte original:
 //   thumbnail  800 px  the grids (home page, "All photos", the viewer's thumbnail strip, the admin)
 //   large      2400 px the full-screen viewer and the home-page splash (it becomes the photo's `url`)
+//   portrait  9:16 crop, 1800 px tall, of the home-page splash only (makePortrait below)
 // The original is kept (Media.storageKey), e.g. to remake the copies later; only its metadata is removed
 // (strip-metadata.ts).
 
@@ -43,6 +44,29 @@ async function encode(image: ReturnType<typeof open>, size: number, quality: num
 // Throws when the bytes are not a decodable image. That doubles as a real validity check: the
 // magic-byte sniffing (image-type.ts) only reads the first few bytes, so a truncated or corrupt
 // file would otherwise get through.
+// The splash fills the screen (object-fit: cover, centred), so on a phone held upright only the middle strip
+// of a landscape photo is visible, scaled to the screen's height. This is that strip, cut in advance: the
+// phone gets the same pixels it shows now, at the large copy's vertical detail (1800 px, as in a 2400×1800
+// copy), in well under half the bytes. null when the photo is already that narrow.
+export const PORTRAIT_ASPECT = 9 / 16; // width / height; the client uses it for <source media>
+export const PORTRAIT_MAX_HEIGHT = 1800;
+const PORTRAIT_QUALITY = 80;
+
+export async function makePortrait(input: Buffer): Promise<ImageVariant | null> {
+  const meta = await open(input).metadata();
+  const shown = meta.autoOrient ?? meta;
+  const w = shown.width ?? 0;
+  const h = shown.height ?? 0;
+  if (!w || !h || w / h <= PORTRAIT_ASPECT) return null;
+  const height = Math.min(h, PORTRAIT_MAX_HEIGHT);
+  const width = Math.round(height * PORTRAIT_ASPECT);
+  const { data, info } = await open(input)
+    .resize({ width, height, fit: 'cover', position: 'centre' })
+    .webp({ quality: PORTRAIT_QUALITY })
+    .toBuffer({ resolveWithObject: true });
+  return { data, width: info.width, height: info.height };
+}
+
 export async function makeVariants(input: Buffer): Promise<ImageVariants> {
   const thumbnail = await encode(open(input), THUMBNAIL_MAX_SIZE, THUMBNAIL_QUALITY);
 

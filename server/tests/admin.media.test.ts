@@ -6,7 +6,7 @@ import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { sniffImage } from '../src/lib/image-type.js';
 import { stripMetadata } from '../src/lib/strip-metadata.js';
-import { allKeysFor, largeKeyFor, thumbnailKeyFor, UPLOADS_DIR } from '../src/lib/storage.js';
+import { allKeysFor, largeKeyFor, portraitKeyFor, thumbnailKeyFor, UPLOADS_DIR } from '../src/lib/storage.js';
 import { MAX_UPLOAD_BYTES } from '../src/modules/media/media.routes.js';
 import { call, createUser, prisma, resetDb, startServer, type TestServer } from './helpers.js';
 
@@ -209,6 +209,7 @@ describe('thumbnails', () => {
       'gallery/house/abc.jpg',
       'gallery/house/abc-thumb.webp',
       'gallery/house/abc-large.webp',
+      'gallery/house/abc-portrait.webp',
     ]);
   });
 
@@ -334,15 +335,39 @@ describe('large copy (the image of the full-screen viewer and the splash)', () =
     expect((await call(srv, 'GET', '/gallery')).body.hero.url).toBe(hero.url);
   });
 
-  it('all three files go when the photo is deleted or the splash is replaced', async () => {
+  it('the splash also gets a 9:16 crop for phones held upright, a gallery photo does not', async () => {
+    const hero = (await uploadOk(BIG, { isHero: 'true' }, 'image/jpeg')) as { storageKey: string; portraitUrl: string };
+    expect(hero.portraitUrl).toBe(`/uploads/${portraitKeyFor(hero.storageKey)}`);
+    expect((await call(srv, 'GET', '/gallery')).body.hero.portraitUrl).toBe(hero.portraitUrl);
+
+    const crop = await fileOf(portraitKeyFor(hero.storageKey));
+    // 2500×1875 → the middle strip at full height, capped at 1800 px: 1013×1800 (9:16).
+    expect(await sharp(crop).metadata()).toMatchObject({ format: 'webp', width: 1013, height: 1800 });
+    expect(crop.length).toBeLessThan((await fileOf(largeKeyFor(hero.storageKey))).length / 1.5);
+
+    const photo = (await uploadOk(BIG, {}, 'image/jpeg')) as { storageKey: string; portraitUrl: string | null };
+    expect(photo.portraitUrl).toBeNull();
+    expect(await exists(portraitKeyFor(photo.storageKey))).toBe(false);
+  });
+
+  it('a splash that is already narrow gets no crop', async () => {
+    const tall = await blank(900, 1800, 12).jpeg().toBuffer();
+    const hero = (await uploadOk(tall, { isHero: 'true' }, 'image/jpeg')) as { portraitUrl: string | null };
+    expect(hero.portraitUrl).toBeNull();
+  });
+
+  it('all its files go when the photo is deleted or the splash is replaced', async () => {
     const photo = await uploadOk(BIG, {}, 'image/jpeg');
     const first = await uploadOk(BIG, { isHero: 'true' }, 'image/jpeg');
+    expect(await exists(portraitKeyFor(first.storageKey))).toBe(true);
     const second = await uploadOk(JPEG, { isHero: 'true' }, 'image/jpeg');
 
     for (const key of allKeysFor(first.storageKey)) expect(await exists(key)).toBe(false); // old splash
     expect(await exists(second.storageKey)).toBe(true);
 
-    for (const key of allKeysFor(photo.storageKey)) expect(await exists(key)).toBe(true);
+    for (const key of [photo.storageKey, thumbnailKeyFor(photo.storageKey), largeKeyFor(photo.storageKey)]) {
+      expect(await exists(key)).toBe(true);
+    }
     expect((await call(srv, 'DELETE', `/admin/media/${photo.id}`, { token: owner })).status).toBe(200);
     for (const key of allKeysFor(photo.storageKey)) expect(await exists(key)).toBe(false);
   });

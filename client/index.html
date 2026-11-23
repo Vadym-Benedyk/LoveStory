@@ -8,7 +8,40 @@
     <meta name="theme-color" content="#3E5641" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Corinthia:wght@400;700&family=Playfair+Display:wght@500;700&family=Lora:wght@500;700&family=Montserrat:wght@400;600&family=Caveat:wght@500;700&family=Marck+Script&display=swap" rel="stylesheet">
+    <!-- Corinthia: the logo and footer headings. The hero's optional fonts are loaded only when chosen
+         (src/features/public/home/textStyle.ts). -->
+    <link href="https://fonts.googleapis.com/css2?family=Corinthia:wght@700&display=swap" rel="stylesheet">
+    <script>
+      // The home page's splash photo is its largest element, and its address comes from /api/gallery.
+      // Ask for it now instead of after the app's JS has loaded, and preload the copy this screen will
+      // use (the 9:16 crop on phones held upright: HERO_PORTRAIT_MEDIA in src/shared/hero.ts). The app
+      // takes this response instead of asking again (takeEarlyGallery in src/shared/api/queries.ts).
+      if (location.pathname === '/') {
+        window.__earlyGallery = fetch('/api/gallery', { credentials: 'same-origin' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .catch(function () { return null; });
+        window.__earlyGallery.then(function (g) {
+          var hero = g && g.hero;
+          if (!hero) return;
+          var portrait = '(max-aspect-ratio: 9/16)';
+          var add = function (href, media) {
+            var link = document.createElement('link');
+            link.rel = 'preload';
+            link.as = 'image';
+            link.href = href;
+            link.setAttribute('fetchpriority', 'high');
+            if (media) link.media = media;
+            document.head.appendChild(link);
+          };
+          if (hero.portraitUrl) {
+            add(hero.portraitUrl, portrait);
+            add(hero.url, 'not all and ' + portrait);
+          } else {
+            add(hero.url);
+          }
+        });
+      }
+    </script>
     <meta
       name="description"
       content="A private 60 m² riverside guest house — fishing, fire-cooking, and a heated outdoor tub. Your boutique countryside escape."

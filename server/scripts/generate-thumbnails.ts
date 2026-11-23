@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 /**
- * Make the lighter copies (thumbnail + 2400 px "large" version) for photos uploaded before they existed.
+ * Make the lighter copies (thumbnail + 2400 px "large" version, and the splash's 9:16 phone copy) for photos
+ * uploaded before they existed.
  * New uploads get them automatically. Safe to run any time and more than once: a photo that already
  * has everything it needs is left alone. Originals are never changed or deleted.
  *
@@ -14,10 +15,11 @@
  */
 import 'dotenv/config';
 import { prisma } from '../src/lib/prisma.js';
-import { makeVariants } from '../src/lib/image-variants.js';
+import { makePortrait, makeVariants } from '../src/lib/image-variants.js';
 import {
   isStorageConfigured,
   largeKeyFor,
+  portraitKeyFor,
   publicUrlFor,
   putObject,
   readObject,
@@ -41,14 +43,15 @@ async function main() {
     const needsThumbnail = all || !photo.thumbnailUrl;
     // `url` ends with -large.webp once the photo's large copy is in use.
     const needsLarge = all || !photo.url.endsWith('-large.webp');
-    if (!needsThumbnail && !needsLarge) {
+    const needsPortrait = photo.isHero && (all || !photo.portraitUrl);
+    if (!needsThumbnail && !needsLarge && !needsPortrait) {
       optimal++;
       continue;
     }
     try {
       const original = await readObject(photo.storageKey);
       const { thumbnail, large } = await makeVariants(original);
-      const data: { thumbnailUrl?: string; url?: string } = {};
+      const data: { thumbnailUrl?: string; url?: string; portraitUrl?: string } = {};
       const done: string[] = [];
 
       if (needsThumbnail) {
@@ -62,6 +65,16 @@ async function main() {
         await putObject(key, large.data, 'image/webp');
         data.url = publicUrlFor(key);
         done.push(`large ${kb(large.data.length)} (original ${kb(original.length)})`);
+      }
+
+      if (needsPortrait) {
+        const portrait = await makePortrait(original);
+        if (portrait) {
+          const key = portraitKeyFor(photo.storageKey);
+          await putObject(key, portrait.data, 'image/webp');
+          data.portraitUrl = publicUrlFor(key);
+          done.push(`portrait ${portrait.width}x${portrait.height} ${kb(portrait.data.length)}`);
+        }
       }
 
       if (Object.keys(data).length === 0) {

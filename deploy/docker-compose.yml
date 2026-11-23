@@ -14,8 +14,8 @@ services:
     build:
       context: ..
       dockerfile: server/Dockerfile
-    # A prebuilt image (API_IMAGE=registry/name:tag, then `docker compose pull`) or built right here.
-    image: ${API_IMAGE:-lovestory-api:local}
+    # Built by GitHub Actions and pulled by release.sh (IMAGE_REGISTRY in .env), or built right here.
+    image: lovestory-api:local
     restart: unless-stopped
     env_file: .env
     environment:

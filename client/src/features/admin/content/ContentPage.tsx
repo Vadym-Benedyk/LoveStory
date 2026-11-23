@@ -22,7 +22,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { LANGS, translations, type Lang } from '@/i18n/translations';
-import { TEXT_COLORS, TEXT_FONTS, isHexColor } from '@/features/public/home/textStyle';
+import { TEXT_COLORS, TEXT_FONTS, isHexColor, loadTextFonts } from '@/features/public/home/textStyle';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useToast } from '@/shared/ui/ToastProvider';
 import { TERMS, TERMS_KEY, serializeTerms } from '@/features/public/terms/termsContent';
@@ -100,6 +100,8 @@ const newCustomRow = (key = '', value = '', existing = false): CustomRow => ({
 
 export function ContentPage() {
   const { t } = useLanguage();
+  // The font menu shows each font in itself, so here (admin only) all of them are loaded.
+  useEffect(() => loadTextFonts(TEXT_FONTS.map((f) => f.key)), []);
   // Text the site shows while the field is empty (built-in translation), used as a placeholder.
   const builtIn = (key: string) => {
     if (key === TERMS_KEY) return undefined;

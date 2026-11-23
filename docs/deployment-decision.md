@@ -37,8 +37,10 @@ Wiring:
 - S3 access: an IAM user limited to the media bucket, keys in the server's `.env`. Lightsail instance
   IAM roles are reported as unavailable (community answer, not confirmed in the official docs).
 - Release: a push to `main` runs GitHub Actions (checks, then `deploy/release.sh` on the server over SSH
-  with a forced-command key; set up 2026-11-13). By hand: `git pull`, `docker compose build`, `prisma:push` through the `tools` service, `docker
-  compose up -d` (or build elsewhere and pull, with `API_IMAGE`). Runbook:
+  with a forced-command key; set up 2026-11-13). Since 2026-11-23 the images are built by GitHub Actions
+  and pulled from ghcr.io (`IMAGE_REGISTRY`): building them on the 1 GB server took ~5 minutes, during
+  which the site answered in 1.4-3.5 s instead of ~0.13 s and the API ended up in swap. By hand:
+  `release.sh`, or `docker compose build`, `prisma:push` through the `tools` service, `docker compose up -d`. Runbook:
   [`deploy/README.md`](../deploy/README.md). The image builds for both `linux/amd64` and
   `linux/arm64`. The API is down for a few seconds during a redeploy (single SQLite writer); the
   static site stays up.

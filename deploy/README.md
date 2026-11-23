@@ -41,9 +41,12 @@ Then delete `OWNER_PASSWORD` from `.env` and run `docker compose up -d --force-r
 
 **Automatic (normal way):** merge `dev` into `main` and push. GitHub Actions
 ([`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)) runs the checks (types, tests,
-client build) and then connects to the server with a deploy key that can only run
-[`release.sh`](release.sh): backup, checkout of that commit, build, `prisma:push`, container swap, health
-check of the API and the site. A failed step leaves the running containers as they were; the log of each release is in
+client build), builds the three images (API, tools, Caddy with the client) and pushes them to
+`ghcr.io/<owner>/lovestory-{api,tools,web}:<commit>`, then connects to the server with a deploy key that
+can only run [`release.sh`](release.sh): backup, checkout of that commit, pull of its images (with
+`IMAGE_REGISTRY` in `.env`; built on the server without it), `prisma:push`, container swap, health check of
+the API and the site. The packages must be public, since the server pulls without logging in (set once
+in the owner's GitHub Packages settings). A failed step leaves the running containers as they were; the log of each release is in
 `~/lovestory-release.log` and in the Actions run. The key, the server address and its host key are secrets
 of the `production` environment of the repository, which only `main` may use.
 
@@ -60,8 +63,14 @@ To replace the key: generate a new pair, swap that line, `gh secret set DEPLOY_S
 **By hand** (the same steps, for example when `prisma:push` stopped a release):
 
 ```bash
+cd /opt/lovestory/deploy && ./release.sh <commit of main>   # or no argument: the tip of main
+```
+
+Or step by step, building here (slow; one image at a time, as 1 GB of RAM is not enough for them together):
+
+```bash
 cd /opt/lovestory && git pull && cd deploy
-docker compose build api && docker compose --profile tools build tools && docker compose build caddy   # one at a time: 1 GB of RAM
+docker compose build api && docker compose --profile tools build tools && docker compose build caddy
 docker compose run --rm tools npm run prisma:push
 docker compose up -d
 ```
@@ -71,9 +80,10 @@ open keep working: the client files of earlier releases stay for two weeks (`cli
 `prisma:push` refuses a change because it would lose data, stop there: take a backup (below) and decide
 by hand, do not force it. One known false alarm: adding a nullable unique column (for example
 `Booking.reviewInviteToken`, release of 2026-11-13) makes `prisma:push` warn about a unique constraint;
-with the column new and empty nothing can be lost, so `prisma db push --accept-data-loss` is right there. To build elsewhere, set `API_IMAGE` in `.env` and use `docker compose pull api`
-on the server instead of `build`. The `tools` and Caddy (client) images are always built on the server
-from the checkout.
+with the column new and empty nothing can be lost, so `prisma db push --accept-data-loss` is right there.
+
+Roll back: run the release of an earlier commit of `main` (Actions > the older run > Re-run, or
+`./release.sh <commit>` on the server); its images stay in the registry. A schema change is not rolled back.
 
 ## Backups and restore
 

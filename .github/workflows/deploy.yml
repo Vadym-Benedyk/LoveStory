@@ -1,6 +1,14 @@
-# Every push to main: checks (types, tests, client build), then the release of the site and the API
-# on the Lightsail server (deploy/release.sh, over SSH with a key that can only run that script). The
-# client is built there, into the Caddy image (client/Dockerfile).
+# Every push to main: checks (types, tests, client build) and, at the same time, the three Docker images
+# built here and pushed to GitHub's registry (ghcr.io/<owner>/lovestory-{api,tools,web}:<commit>); then
+# the release on the Lightsail server (deploy/release.sh, over SSH with a key that can only run that
+# script), which pulls those images instead of building them. Building on the 1 GB server took about
+# 5 minutes, during which the site answered in seconds instead of ~0.1 s.
+#
+# Run by hand (Actions > Deploy > Run workflow) on another branch, it only checks and pushes the images:
+# releasing is for main alone.
+#
+# The packages must be public (the server pulls them without logging in): after the very first push, set
+# each of the three to Public in the owner's Packages settings.
 #
 # Not used while the account may not create CloudFront distributions: S3 + CloudFront for the site
 # (infra/app.yml, infra/deploy-client.sh).
@@ -44,8 +52,52 @@ jobs:
       - run: npm test
       - run: npm run build:client
 
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: api
+            dockerfile: server/Dockerfile
+            target: runtime
+          - name: tools
+            dockerfile: server/Dockerfile
+            target: tools
+          - name: web
+            dockerfile: client/Dockerfile
+            target: ""
+    steps:
+      - uses: actions/checkout@v4
+      # Registry names must be lower case; the owner's login may not be.
+      - id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/lovestory-${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          # The Lightsail instance is x86-64.
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.name.outputs.image }}:${{ github.sha }}
+          # Links the package to this repository (and its visibility settings) on GitHub.
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
   deploy:
-    needs: check
+    needs: [check, images]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
