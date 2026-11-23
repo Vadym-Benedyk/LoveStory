@@ -39,10 +39,15 @@ authRouter.post(
   }),
 );
 
-authRouter.post('/logout', (req, res) => {
-  res.clearCookie(REFRESH_COOKIE, { ...cookieOpts, maxAge: undefined });
-  res.json({ ok: true });
-});
+// Ends this browser's session on the server too, so a copy of the cookie stops working.
+authRouter.post(
+  '/logout',
+  asyncHandler(async (req, res) => {
+    await service.logout(req.cookies?.[REFRESH_COOKIE]);
+    res.clearCookie(REFRESH_COOKIE, { ...cookieOpts, maxAge: undefined });
+    res.json({ ok: true });
+  }),
+);
 
 authRouter.get(
   '/me',
@@ -66,7 +71,12 @@ authRouter.post(
     }),
   }),
   asyncHandler(async (req, res) => {
-    await service.changePassword(req.user!.id, req.body.currentPassword, req.body.newPassword);
-    res.json({ ok: true });
+    const { endedSessions } = await service.changePassword(
+      req.user!.id,
+      req.user!.sid,
+      req.body.currentPassword,
+      req.body.newPassword,
+    );
+    res.json({ ok: true, endedSessions });
   }),
 );

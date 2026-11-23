@@ -147,6 +147,8 @@ export const uk: Record<string, string> = {
   'booking.success.note': 'Незабаром ми вам зателефонуємо, щоб підтвердити замовлення.',
   'booking.success.backHome': 'Повернутися на головну',
   'booking.error': 'Не вдалося надіслати. Спробуйте ще раз.',
+  'booking.tooManyOpen': 'У вас уже є кілька заявок, що чекають на підтвердження. Ми зателефонуємо вам щодо них.',
+  'booking.rateLimited': 'Забагато спроб. Спробуйте пізніше або зателефонуйте нам.',
 
   // ===== Адмін-панель =====
   'admin.nav.dashboard': 'Панель',
@@ -430,7 +432,7 @@ export const uk: Record<string, string> = {
   'admin.settings.password.minLength': 'Щонайменше 10 символів.',
   'admin.settings.password.mismatch': 'Паролі не збігаються.',
   'admin.settings.password.submit': 'Змінити пароль',
-  'admin.settings.password.changed': 'Пароль змінено. Наступного разу входьте з новим.',
+  'admin.settings.password.changed': 'Пароль змінено. На інших пристроях адмінку закрито, там увійдіть з новим паролем.',
   'admin.settings.password.wrongCurrent': 'Поточний пароль неправильний.',
   'admin.settings.password.rateLimited': 'Забагато спроб. Спробуйте за 15 хвилин.',
   'admin.settings.password.error': 'Не вдалося змінити пароль. Спробуйте ще раз.',

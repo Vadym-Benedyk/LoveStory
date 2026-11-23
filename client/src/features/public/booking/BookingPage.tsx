@@ -34,6 +34,15 @@ const GUEST_OPTIONS = 6;
 const NAME_RE = /\p{L}/u; // at least one letter
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const MAX_COMMENT = 2000;
+
+// The spam limits (server booking.service.ts) get a message in the visitor's language; other
+// errors show the server's own message.
+function bookingErrorText(error: unknown, t: (key: string) => string): string {
+  const err = (error as { response?: { data?: { error?: { code?: string; message?: string } } } })?.response?.data?.error;
+  if (err?.code === 'TOO_MANY_OPEN_REQUESTS') return t('booking.tooManyOpen');
+  if (err?.code === 'RATE_LIMITED') return t('booking.rateLimited');
+  return err?.message ?? t('booking.error');
+}
 // Keep in sync with server/src/modules/booking/booking.schema.ts.
 const MAX_NIGHTS = 60;
 const MAX_DAYS_AHEAD = 730;
@@ -366,7 +375,7 @@ export function BookingPage() {
 
               {bookingMut.isError && (
                 <Alert severity="error">
-                  {(bookingMut.error as any)?.response?.data?.error?.message ?? t('booking.error')}
+                  {bookingErrorText(bookingMut.error, t)}
                 </Alert>
               )}
 

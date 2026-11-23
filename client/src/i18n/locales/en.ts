@@ -142,6 +142,8 @@ export const en: Record<string, string> = {
   'booking.success.note': 'We will call you shortly to confirm your booking.',
   'booking.success.backHome': 'Back to home',
   'booking.error': 'Could not submit. Please try again.',
+  'booking.tooManyOpen': 'You already have several requests waiting. We will call you about them.',
+  'booking.rateLimited': 'Too many attempts. Please try later or give us a call.',
 
   // ===== Admin panel =====
   'admin.nav.dashboard': 'Dashboard',
@@ -425,7 +427,7 @@ export const en: Record<string, string> = {
   'admin.settings.password.minLength': 'At least 10 characters.',
   'admin.settings.password.mismatch': 'Passwords do not match.',
   'admin.settings.password.submit': 'Change password',
-  'admin.settings.password.changed': 'Password changed. Use the new one next time you sign in.',
+  'admin.settings.password.changed': 'Password changed. Other devices were signed out; sign in there with the new password.',
   'admin.settings.password.wrongCurrent': 'Current password is incorrect.',
   'admin.settings.password.rateLimited': 'Too many attempts. Try again in 15 minutes.',
   'admin.settings.password.error': 'Could not change the password. Please try again.',

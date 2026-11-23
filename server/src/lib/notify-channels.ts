@@ -73,6 +73,20 @@ export function formatNewRequestMessage(n: NewRequestNotice): NotificationMessag
   };
 }
 
+// Sent once when the hourly number of website requests passes the alert limit
+// (booking.service.ts, OWNER_ALERTS_PER_HOUR): the next ones go to the admin inbox only.
+export function formatRequestFloodMessage(count: number, adminUrl: string): NotificationMessage {
+  return {
+    subject: 'Незвично багато заявок за годину',
+    text: [
+      `⚠️ За останню годину надійшло ${count} заявок із сайту — це схоже на спам.`,
+      '',
+      'Окремі сповіщення про нові заявки призупинено до кінця цієї години; усі заявки є в адмінці.',
+      `Заявки: ${adminUrl}`,
+    ].join('\n'),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Review invitations (reviews/review-invite.service.ts)
 // ---------------------------------------------------------------------------

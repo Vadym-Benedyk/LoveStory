@@ -1,9 +1,11 @@
 import { customAlphabet } from 'nanoid';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
-import { BadRequest, Conflict, NotFound } from '../../lib/errors.js';
+import { AppError, BadRequest, Conflict, NotFound } from '../../lib/errors.js';
+import { logger } from '../../lib/logger.js';
 import { toDateOnly } from '../../lib/dates.js';
-import { adminRequestsUrl, notifyNewRequest } from '../../lib/notify.js';
+import { adminRequestsUrl, notifyNewRequest, notifyOwner } from '../../lib/notify.js';
+import { formatRequestFloodMessage } from '../../lib/notify-channels.js';
 import { buildQuote, type QuoteAddonInput } from '../pricing/pricing.engine.js';
 import { getOverlappingPending, isRangeAvailable } from '../availability/availability.service.js';
 import type { AdminCreateBookingInput, CreateBookingInput, QuoteInput } from './booking.schema.js';
@@ -47,6 +49,15 @@ export async function quote(input: QuoteInput) {
   });
 }
 
+// Spam limits of the public form, on top of the per-IP rate limit (which a bot with many addresses
+// gets around):
+// - the same request sent again (same phone and dates, still waiting) returns the existing one;
+// - one phone number can have only a few requests waiting at a time;
+// - past OWNER_ALERTS_PER_HOUR website requests in an hour the owner gets one warning instead of an
+//   alert per request (they all still land in the admin inbox).
+export const MAX_OPEN_REQUESTS_PER_PHONE = 3;
+export const OWNER_ALERTS_PER_HOUR = 20;
+
 export async function createBookingRequest(input: CreateBookingInput) {
   const checkIn = toDateOnly(input.checkIn);
   const checkOut = toDateOnly(input.checkOut);
@@ -77,6 +88,23 @@ export async function createBookingRequest(input: CreateBookingInput) {
     throw BadRequest(`Minimum stay is ${q.minNights} nights for the selected dates`);
   }
 
+  const open = await prisma.booking.findMany({
+    where: { guestPhone: input.guestPhone, status: 'PENDING' },
+    select: { id: true, checkIn: true, checkOut: true },
+  });
+  const same = open.find((b) => b.checkIn.getTime() === checkIn.getTime() && b.checkOut.getTime() === checkOut.getTime());
+  if (same) {
+    // A double click or a re-send: no second row and no second alert to the owner.
+    return { booking: await prisma.booking.findUniqueOrThrow({ where: { id: same.id } }), quote: q };
+  }
+  if (open.length >= MAX_OPEN_REQUESTS_PER_PHONE) {
+    throw new AppError(
+      429,
+      'You already have several requests waiting. The owner will call you about them.',
+      'TOO_MANY_OPEN_REQUESTS',
+    );
+  }
+
   const booking = await prisma.booking.create({
     data: {
       reference: refCode(),
@@ -101,6 +129,17 @@ export async function createBookingRequest(input: CreateBookingInput) {
       },
     },
   });
+
+  const lastHour = await prisma.booking.count({
+    where: { source: 'WEBSITE', createdAt: { gte: new Date(Date.now() - 3_600_000) } },
+  });
+  if (lastHour > OWNER_ALERTS_PER_HOUR) {
+    logger.warn({ reference: booking.reference, lastHour }, 'Owner alert skipped: too many requests this hour');
+    if (lastHour === OWNER_ALERTS_PER_HOUR + 1) {
+      void notifyOwner(booking.reference, formatRequestFloodMessage(lastHour, adminRequestsUrl()));
+    }
+    return { booking, quote: q };
+  }
 
   // Fire-and-forget: the guest gets their reference immediately; channel retries/failures
   // are handled and logged inside notifyNewRequest (it never rejects).

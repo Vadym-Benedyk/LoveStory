@@ -37,6 +37,20 @@ function checkPublicStay(d: { checkIn: string; checkOut: string }, ctx: z.Refine
   }
 }
 
+// Add-ons picked on the public form. Bounded so a request can't ask for millions of items (a
+// nonsense price) or send thousands of ids to look up.
+export const MAX_ADDONS = 20;
+export const MAX_ADDON_QUANTITY = 20;
+const addonsInput = z
+  .array(
+    z.object({
+      addonId: z.string().max(64),
+      quantity: z.coerce.number().int().min(1).max(MAX_ADDON_QUANTITY).default(1),
+    }),
+  )
+  .max(MAX_ADDONS)
+  .default([]);
+
 // Guest fields shared by the public request form and admin manual bookings.
 const guestName = z
   .string()
@@ -73,10 +87,8 @@ export const createBookingSchema = z
     checkIn: dateStr,
     checkOut: dateStr,
     comments: z.string().trim().max(2000).optional(),
-    promotionSlug: z.string().optional(),
-    addons: z
-      .array(z.object({ addonId: z.string(), quantity: z.coerce.number().int().min(1).default(1) }))
-      .default([]),
+    promotionSlug: z.string().max(120).optional(),
+    addons: addonsInput,
     consent: z.literal(true, { errorMap: () => ({ message: 'Consent is required' }) }),
     // honeypot — must be empty
     website: z.string().max(0).optional(),
@@ -87,10 +99,8 @@ export const quoteSchema = z
   .object({
     checkIn: dateStr,
     checkOut: dateStr,
-    promotionSlug: z.string().optional(),
-    addons: z
-      .array(z.object({ addonId: z.string(), quantity: z.coerce.number().int().min(1).default(1) }))
-      .default([]),
+    promotionSlug: z.string().max(120).optional(),
+    addons: addonsInput,
   })
   .superRefine(checkPublicStay);
 

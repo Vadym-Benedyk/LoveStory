@@ -127,7 +127,8 @@ adminContentRouter.put(
   validate({
     body: z.object({
       locale: z.enum(LOCALES).default(DEFAULT_LOCALE),
-      blocks: z.array(z.object({ key: z.string().min(1).max(120), value: z.string().max(60000) })),
+      // The site has ~500 texts per language; the cap only stops absurd payloads.
+      blocks: z.array(z.object({ key: z.string().min(1).max(120), value: z.string().max(60000) })).max(1000),
     }),
   }),
   asyncHandler(async (req, res) => {
@@ -148,7 +149,7 @@ adminContentRouter.put(
 adminContentRouter.delete(
   '/content/:key',
   validate({
-    params: z.object({ key: z.string().min(1) }),
+    params: z.object({ key: z.string().min(1).max(120) }),
     query: z.object({ locale: z.enum(LOCALES).optional() }),
   }),
   asyncHandler(async (req, res) => {
