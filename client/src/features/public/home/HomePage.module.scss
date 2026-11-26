@@ -48,11 +48,39 @@
     z-index: 0;
   }
 
-  // The text rises faster than the page: useHeroTextParallax sets --hero-lift (a negative offset that
-  // grows with the scroll). A transform, so it never changes the layout.
+  // The text rises faster than the page. Where the browser has scroll-driven animations, the offset is
+  // a CSS animation tied to the page scroll: it runs on the compositor together with the scrolling
+  // itself, so the text never lags a frame behind the page (the JS-only version did, and stuttered).
+  // Elsewhere useHeroTextParallax sets --hero-lift on every scroll frame instead.
+  // Both are transforms, so they never change the layout.
   .heroInner {
-    transform: translate3d(0, var(--hero-lift, 0px), 0);
     will-change: transform;
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .heroInner {
+      animation: heroLift linear both;
+      animation-timeline: scroll(root); // after the `animation` shorthand, which resets it
+      // Over the first screen of scroll; past it the text is long gone, so the offset stops growing.
+      animation-range: 0 100vh;
+    }
+  }
+
+  @supports not (animation-timeline: scroll()) {
+    .heroInner {
+      transform: translate3d(0, var(--hero-lift, 0px), 0);
+    }
+  }
+}
+
+// (HERO_TEXT_SPEED − 1) × one screen: −50vh for the speed 1.5 in useHeroTextParallax. Change both together.
+@keyframes heroLift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, -50vh, 0);
   }
 }
 

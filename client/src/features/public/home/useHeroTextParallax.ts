@@ -1,9 +1,12 @@
 import { useEffect, type RefObject } from 'react';
 
 // How fast the hero text scrolls up compared with the page: 1 = the same speed, 1.5 = half as fast
-// again (it "runs away" from the photo that stays pinned behind it). Raise it for a stronger effect.
+// again (it "runs away" from the photo that stays pinned behind it). Raise it for a stronger effect,
+// and change the matching offset in HomePage.module.scss (@keyframes heroLift) with it.
 export const HERO_TEXT_SPEED = 1.5;
 
+// Fallback for browsers without CSS scroll-driven animations, which do this in the stylesheet
+// instead (in step with the scrolling, so without the one-frame lag of a scroll listener).
 // Moves `ref` up by the extra distance (HERO_TEXT_SPEED − 1) × scroll, via the CSS variable
 // `--hero-lift` that the stylesheet turns into a transform (so it doesn't touch the layout and
 // can't cause layout shifts). Nothing for visitors who ask for reduced motion.
@@ -11,6 +14,7 @@ export function useHeroTextParallax(ref: RefObject<HTMLElement>) {
   useEffect(() => {
     const el = ref.current;
     if (!el || !window.matchMedia('(prefers-reduced-motion: no-preference)').matches) return;
+    if (CSS.supports('animation-timeline', 'scroll()')) return; // the stylesheet animates it
 
     let frame = 0;
     const update = () => {
